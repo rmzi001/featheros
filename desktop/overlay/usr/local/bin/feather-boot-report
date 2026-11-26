@@ -1,20 +1,8 @@
 #!/bin/sh
-# Live boot QA reporter: runs feather-selftest (including Wine cmd.exe smoke) and logs to /dev/ttyS0
+# Live boot QA reporter: runs feather-selftest (including Wine cmd.exe smoke) as live user and logs to /dev/ttyS0
 set -u
 
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-export WINEDEBUG="-all"
-export WINEDLLOVERRIDES="mscoree,mshtml="
-export DISPLAY=":0"
-
-TMP_HOME="/tmp/feather-selftest-home"
-TMP_PREFIX="/tmp/feather-selftest-wine"
-TMP_RUNTIME="/tmp/feather-selftest-runtime"
-mkdir -p "$TMP_HOME" "$TMP_RUNTIME"
-chmod 0700 "$TMP_RUNTIME"
-export HOME="$TMP_HOME"
-export WINEPREFIX="$TMP_PREFIX"
-export XDG_RUNTIME_DIR="$TMP_RUNTIME"
 
 # Allow LightDM, XFCE, NetworkManager, and zramswap to settle
 sleep 8
@@ -22,7 +10,40 @@ sleep 8
 REPORT_TXT="/var/log/featheros-selftest.log"
 
 if command -v feather-selftest >/dev/null 2>&1; then
-  feather-selftest > "$REPORT_TXT" 2>&1 || true
+  if id -u feather >/dev/null 2>&1; then
+    FEATHER_UID="$(id -u feather)"
+    su -s /bin/sh feather -c '
+      export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      export WINEDEBUG="-all"
+      export WINEDLLOVERRIDES="mscoree,mshtml="
+      TMP_PREFIX="$(mktemp -d /tmp/feather-selftest-wine.XXXXXX)"
+      TMP_RT="$(mktemp -d /tmp/feather-selftest-rt.XXXXXX)"
+      chmod 0700 "$TMP_RT"
+      export WINEPREFIX="$TMP_PREFIX"
+      if [ -d "/run/user/'"$FEATHER_UID"'" ]; then
+        export XDG_RUNTIME_DIR="/run/user/'"$FEATHER_UID"'"
+      else
+        export XDG_RUNTIME_DIR="$TMP_RT"
+      fi
+      if [ -r "$HOME/.Xauthority" ]; then
+        export DISPLAY=":0"
+        export XAUTHORITY="$HOME/.Xauthority"
+      else
+        unset DISPLAY
+      fi
+      feather-selftest
+      rm -rf "$TMP_PREFIX" "$TMP_RT" 2>/dev/null || true
+    ' > "$REPORT_TXT" 2>&1 || true
+  else
+    TMP_HOME="/tmp/feather-selftest-home"
+    TMP_PREFIX="/tmp/feather-selftest-wine"
+    TMP_RUNTIME="/tmp/feather-selftest-runtime"
+    mkdir -p "$TMP_HOME" "$TMP_RUNTIME"
+    chmod 0700 "$TMP_RUNTIME"
+    env -u DISPLAY HOME="$TMP_HOME" WINEPREFIX="$TMP_PREFIX" XDG_RUNTIME_DIR="$TMP_RUNTIME" WINEDEBUG="-all" WINEDLLOVERRIDES="mscoree,mshtml=" feather-selftest > "$REPORT_TXT" 2>&1 || true
+    rm -rf "$TMP_HOME" "$TMP_PREFIX" "$TMP_RUNTIME" 2>/dev/null || true
+  fi
+
   if [ -w /dev/ttyS0 ]; then
     {
       echo ""
@@ -34,5 +55,4 @@ if command -v feather-selftest >/dev/null 2>&1; then
   fi
 fi
 
-rm -rf "$TMP_HOME" "$TMP_PREFIX" "$TMP_RUNTIME" 2>/dev/null || true
 exit 0

@@ -66,6 +66,9 @@ def _default_run(cmd: list[str], timeout: int = 20) -> tuple[int, str]:
     if cmd and "wine" in Path(cmd[0]).name.lower():
         env.setdefault("WINEDEBUG", "-all")
         env.setdefault("WINEDLLOVERRIDES", "mscoree,mshtml=")
+        xauth = env.get("XAUTHORITY", "")
+        if env.get("DISPLAY") and xauth and not Path(xauth).is_file():
+            env.pop("DISPLAY", None)
         xdg = env.get("XDG_RUNTIME_DIR", "")
         if not xdg or not Path(xdg).is_dir():
             rt_dir = Path(tempfile.gettempdir()) / f"feather-xdg-{os.getuid() if hasattr(os, 'getuid') else 0}"
@@ -264,7 +267,7 @@ def run_selftest(
         wine_bin = sys_probe.wine_path or sys_probe.wine64_path or "wine"
         rc, out = run_cmd([wine_bin, "cmd", "/c", "echo", "FEATHEROS_WIN32_OK"], 45)
         win32_ok = rc == 0 and "FEATHEROS_WIN32_OK" in out
-        win32_detail = "Win32 cmd.exe returned FEATHEROS_WIN32_OK" if win32_ok else f"rc={rc}: {out[:160]}"
+        win32_detail = "Win32 cmd.exe returned FEATHEROS_WIN32_OK" if win32_ok else f"rc={rc}: {out[:400]}"
     elif not run_wine_smoke:
         win32_ok = sys_probe.can_run_wine
         win32_detail = "Skipped live Wine exec (--quick); Wine binary detected"

@@ -33,6 +33,9 @@ echo "[FeatherOS chroot] Installing core XFCE 4.20 + Wine + GRUB2 packages (--no
 mapfile -t CORE_PKGS < <(read_pkg_list "${BUILD_TMP}/packages-core.list")
 apt-get install -y --no-install-recommends "${CORE_PKGS[@]}"
 
+echo "[FeatherOS chroot] Ensuring Wine 64-bit & 32-bit runtime libraries (with recommends)..."
+apt-get install -y wine wine64 wine32:i386
+
 echo "[FeatherOS chroot] Installing optional apps, Bluetooth, firmware, Calamares & gaming extras..."
 mapfile -t OPT_PKGS < <(read_pkg_list "${BUILD_TMP}/packages-optional.list")
 for pkg in "${OPT_PKGS[@]}"; do
@@ -113,6 +116,28 @@ chmod 0440 "/etc/sudoers.d/90-${LIVE_USER}"
 # Apply Windows 11 Dark/Light Glass skeleton configs to live user home
 cp -a /etc/skel/. "/home/${LIVE_USER}/"
 chown -R "${LIVE_USER}:${LIVE_USER}" "/home/${LIVE_USER}"
+
+echo "[FeatherOS chroot] Smoke-testing live Wine Win32 cmd.exe execution as '${LIVE_USER}'..."
+su -s /bin/bash "${LIVE_USER}" -c '
+  set -euo pipefail
+  TMP_W="$(mktemp -d)"
+  TMP_R="$(mktemp -d)"
+  chmod 0700 "$TMP_R"
+  trap "rm -rf \"$TMP_W\" \"$TMP_R\"" EXIT
+  export WINEPREFIX="$TMP_W"
+  export XDG_RUNTIME_DIR="$TMP_R"
+  export WINEDLLOVERRIDES="mscoree,mshtml="
+  export WINEDEBUG="-all"
+  unset DISPLAY
+  OUT="$(wine cmd /c echo FEATHEROS_WIN32_OK 2>&1 || true)"
+  echo "[FeatherOS chroot] Wine smoke output: ${OUT}"
+  if ! printf "%s\n" "${OUT}" | grep -q "FEATHEROS_WIN32_OK"; then
+    echo "[FeatherOS chroot] Wine smoke failed; collecting diagnostics..." >&2
+    WINEDEBUG="err+all" wine cmd /c echo FEATHEROS_WIN32_OK || true
+    ls -la /usr/lib/wine /usr/lib/x86_64-linux-gnu/wine /usr/lib/i386-linux-gnu/wine 2>/dev/null || true
+    exit 1
+  fi
+'
 
 echo "[FeatherOS chroot] Configuring locales, fast-boot services, Plymouth, icons & MIME database..."
 sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen || true
