@@ -146,10 +146,18 @@ jobs:
           wait "${QEMU_PID}" || true
 
           for f in dist/boot-early.ppm dist/boot-desktop.ppm; do
-            test -s "${f}"
-            pnmtopng "${f}" > "${f%.ppm}.png"
-            rm -f "${f}"
+            if [ -s "${f}" ]; then
+              pnmtopng "${f}" > "${f%.ppm}.png"
+              rm -f "${f}"
+            fi
           done
+
+          echo "=== Output directory contents ==="
+          ls -lh dist/
+          echo "=== Head of qemu-serial.log ==="
+          head -n 30 dist/qemu-serial.log || true
+          echo "=== Tail of qemu-serial.log ==="
+          tail -n 50 dist/qemu-serial.log || true
 
           # Empirical check: verify screenshots exist and serial log captured Linux kernel boot
           test -s dist/boot-early.png
@@ -157,11 +165,9 @@ jobs:
           test -s dist/qemu-serial.log
           grep -q "Linux version" dist/qemu-serial.log
           echo "=== FeatherOS QEMU Boot-Test PASSED ==="
-          ls -lh dist/
-          echo "=== Tail of qemu-serial.log ==="
-          tail -n 50 dist/qemu-serial.log
 
       - name: Upload QEMU boot-test proof (screenshots, serial log & checksum)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: featheros-boot-proof
