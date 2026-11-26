@@ -1,0 +1,38 @@
+#!/bin/sh
+# FeatherOS first-login session bootstrap
+set -eu
+
+STAMP="$HOME/.config/featheros/.firstboot-done"
+mkdir -p "$HOME/.config/featheros"
+
+# Ensure default Windows compatibility bottle exists and expose ~/Windows-C shortcut
+if command -v feather-run >/dev/null 2>&1; then
+  if [ ! -d "$HOME/.local/share/featheros/bottles/default" ]; then
+    feather-run bottles create default --windows-version win10 >/dev/null 2>&1 || true
+  fi
+  if [ ! -e "$HOME/Windows-C" ]; then
+    ln -s "$HOME/.local/share/featheros/bottles/default/prefix/drive_c" "$HOME/Windows-C" || true
+  fi
+  feather-run sync >/dev/null 2>&1 || true
+fi
+
+# Apply persisted or default performance profile (starts picom in Balanced mode)
+if command -v feather-ctl >/dev/null 2>&1; then
+  PROFILE="$(feather-ctl profile --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name","balanced"))' 2>/dev/null || echo balanced)"
+  feather-ctl profile "$PROFILE" >/dev/null 2>&1 || true
+fi
+
+# When running from the Live ISO, place Install FeatherOS shortcut on Desktop
+if [ -d /run/live/medium ] && [ -f /usr/share/applications/feather-install.desktop ]; then
+  if [ ! -f "$HOME/Desktop/feather-install.desktop" ]; then
+    cp /usr/share/applications/feather-install.desktop "$HOME/Desktop/feather-install.desktop" || true
+    chmod +x "$HOME/Desktop/feather-install.desktop" || true
+  fi
+fi
+
+if [ ! -f "$STAMP" ]; then
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > "$STAMP"
+  if command -v feather-store >/dev/null 2>&1; then
+    feather-store gui >/dev/null 2>&1 &
+  fi
+fi

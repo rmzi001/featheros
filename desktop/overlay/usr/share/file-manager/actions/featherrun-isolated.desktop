@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Action
+Name=Run in Isolated Bottle (FeatherRun)
+Tooltip=Run this Windows executable inside its own dedicated FeatherOS bottle
+Icon=application-x-ms-dos-executable
+Profiles=profile-isolated;
+
+[X-Action-Profile profile-isolated]
+MimeTypes=application/x-ms-dos-executable;application/x-dosexec;application/vnd.microsoft.portable-executable;application/x-msi;
+Exec=feather-run --isolated %f
+Name=Isolated FeatherRun

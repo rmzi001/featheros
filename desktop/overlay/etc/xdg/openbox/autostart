@@ -1,0 +1,35 @@
+#!/bin/sh
+# FeatherShell Openbox session autostart
+
+# Ensure user directories exist
+mkdir -p "$HOME/Desktop" "$HOME/Documents" "$HOME/Downloads" "$HOME/Pictures"
+
+# Desktop icons + FeatherOS wallpaper via PCManFM (very low RAM)
+if command -v pcmanfm >/dev/null 2>&1; then
+  pcmanfm --desktop --profile default &
+elif command -v feh >/dev/null 2>&1; then
+  feh --bg-fill /usr/share/backgrounds/featheros/wallpaper.svg &
+fi
+
+# Start Windows-style bottom taskbar
+if command -v tint2 >/dev/null 2>&1; then
+  tint2 &
+fi
+
+# Polkit authentication agent so pkexec (Calamares / FeatherStore) prompts cleanly
+if command -v lxpolkit >/dev/null 2>&1; then
+  lxpolkit &
+fi
+
+# Network & Audio system tray icons
+if command -v nm-applet >/dev/null 2>&1; then
+  nm-applet &
+fi
+if command -v volumeicon >/dev/null 2>&1; then
+  volumeicon &
+fi
+
+# Run FeatherOS first-boot & active performance profile setup (starts picom if Balanced)
+if command -v feather-firstboot >/dev/null 2>&1; then
+  feather-firstboot &
+fi

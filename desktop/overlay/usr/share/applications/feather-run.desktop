@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=FeatherRun Windows Launcher
+Comment=Launch Windows .exe and .msi applications seamlessly
+Exec=feather-run %f
+Icon=application-x-ms-dos-executable
+Terminal=false
+NoDisplay=true
+MimeType=application/x-ms-dos-executable;application/x-dosexec;application/vnd.microsoft.portable-executable;application/x-msi;application/x-msdownload;
+Categories=System;Utility;

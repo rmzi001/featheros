@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=FeatherOS
+Description=Minimal dark boot splash for FeatherOS
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/featheros
+ScriptFile=/usr/share/plymouth/themes/featheros/featheros.script

@@ -1,0 +1,29 @@
+# Minimal Plymouth script theme for FeatherOS (zero external image dependencies)
+Window.SetBackgroundTopColor(0.03, 0.04, 0.08);
+Window.SetBackgroundBottomColor(0.06, 0.09, 0.16);
+
+title_img = Image.Text("FeatherOS", 0.92, 0.96, 1.0, 1.0, "Sans Bold 28");
+subtitle_img = Image.Text("Lightweight • Windows-Compatible", 0.58, 0.64, 0.72, 1.0, "Sans 11");
+
+title_sprite = Sprite(title_img);
+title_sprite.SetX(Window.GetWidth() / 2 - title_img.GetWidth() / 2);
+title_sprite.SetY(Window.GetHeight() / 2 - title_img.GetHeight() - 12);
+
+subtitle_sprite = Sprite(subtitle_img);
+subtitle_sprite.SetX(Window.GetWidth() / 2 - subtitle_img.GetWidth() / 2);
+subtitle_sprite.SetY(Window.GetHeight() / 2 + 8);
+
+bar_width = 240;
+bar_height = 4;
+progress_bar_bg = Image.Text("━━━━━━━━━━━━━━━━━━━━━━", 0.15, 0.22, 0.34, 1.0, "Sans 10");
+progress_sprite = Sprite(progress_bar_bg);
+progress_sprite.SetX(Window.GetWidth() / 2 - progress_bar_bg.GetWidth() / 2);
+progress_sprite.SetY(Window.GetHeight() / 2 + 44);
+
+fun message_callback(text) {
+  msg_img = Image.Text(text, 0.22, 0.74, 0.97, 1.0, "Sans 10");
+  msg_sprite = Sprite(msg_img);
+  msg_sprite.SetX(Window.GetWidth() / 2 - msg_img.GetWidth() / 2);
+  msg_sprite.SetY(Window.GetHeight() / 2 + 76);
+}
+Plymouth.SetMessageFunction(message_callback);

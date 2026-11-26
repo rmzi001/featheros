@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=FeatherOS System Diagnostics
+Comment=Inspect RAM, Vulkan/DXVK readiness, Wine multiarch, and active performance profile
+Exec=lxterminal -e sh -c 'feather-ctl status; echo; feather-run doctor; echo; read -p "Press Enter to exit..."'
+Icon=utilities-system-monitor
+Terminal=false
+Categories=System;Monitor;

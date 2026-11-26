@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Install FeatherOS to Disk
+GenericName=OS Installer
+Comment=Install FeatherOS permanently to your internal SSD or hard drive
+Exec=pkexec calamares
+Icon=drive-harddisk
+Terminal=false
+Categories=System;Settings;
+StartupNotify=true

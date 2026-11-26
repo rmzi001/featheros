@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "featheros"
+version = "0.1.0"
+description = "FeatherOS Windows compatibility layer, bottle manager, and system control suite"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+dependencies = []
+
+[project.optional-dependencies]
+gui = ["PyGObject>=3.42"]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+feather-run = "featheros.cli:main"
+feather-compat = "featheros.compat_gui:main"
+feather-ctl = "featheros.ctl:main"
+feather-store = "featheros.store:main"
+
+[tool.setuptools.packages.find]
+where = ["compat"]
+
+[tool.pytest.ini_options]
+pythonpath = ["compat"]
+testpaths = ["tests"]

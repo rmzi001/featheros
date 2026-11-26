@@ -1,0 +1,4 @@
+# FeatherOS compressed RAM swap (zram-tools)
+ALGO=zstd
+PERCENT=50
+PRIORITY=100

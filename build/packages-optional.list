@@ -1,0 +1,22 @@
+# FeatherOS Optional Desktop Utilities, Hardware Firmware & Gaming Extras
+# Installed best-effort per package so ISO builds stay portable across Debian suites.
+plymouth-themes
+lxpolkit
+volumeicon-alsa
+pavucontrol
+mousepad
+gpicview
+xarchiver
+lxtask
+scrot
+dxvk
+winetricks
+gamemode
+mangohud
+p7zip-full
+firmware-linux
+firmware-iwlwifi
+firmware-realtek
+firmware-amd-graphics
+firefox-esr
+calamares

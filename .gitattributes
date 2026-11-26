@@ -1,0 +1,19 @@
+# Enforce LF line endings for all Linux scripts, configs, and overlays
+* text=auto eol=lf
+*.sh text eol=lf
+*.conf text eol=lf
+*.list text eol=lf
+*.xml text eol=lf
+*.desktop text eol=lf
+*.ini text eol=lf
+*.csv text eol=lf
+*.plymouth text eol=lf
+*.script text eol=lf
+*.svg text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.py text eol=lf
+
+# Windows PowerShell scripts
+*.ps1 text eol=crlf

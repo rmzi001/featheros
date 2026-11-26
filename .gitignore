@@ -1,0 +1,22 @@
+# Build artifacts
+dist/
+work/
+out/
+*.iso
+*.img
+*.qcow2
+*.squashfs
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+build-py/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp

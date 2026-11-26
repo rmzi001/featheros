@@ -1,0 +1,33 @@
+---
+componentName: featheros
+
+welcomeStyleCalamares: true
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 860px,560px
+windowPlacement: center
+
+strings:
+  productName: FeatherOS
+  shortProductName: FeatherOS
+  version: 0.1.0
+  shortVersion: 0.1
+  versionedName: FeatherOS 0.1.0 (Plume)
+  shortVersionedName: FeatherOS 0.1
+  bootloaderEntryName: FeatherOS
+  productUrl: https://featheros.local
+  supportUrl: https://featheros.local
+  releaseNotesUrl: https://featheros.local
+
+images:
+  productLogo: "/usr/share/backgrounds/featheros/wallpaper.svg"
+  productIcon: "/usr/share/backgrounds/featheros/wallpaper.svg"
+  productWelcome: "/usr/share/backgrounds/featheros/wallpaper.svg"
+
+slideshowAPI: 2
+
+style:
+  SidebarBackground: "#0f172a"
+  SidebarText: "#e2e8f0"
+  SidebarTextCurrent: "#38bdf8"
+  SidebarBackgroundCurrent: "#1e293b"

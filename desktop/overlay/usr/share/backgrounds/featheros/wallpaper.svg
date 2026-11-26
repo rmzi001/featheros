@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#070b14"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#13233d"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="46%" r="42%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.22"/>
+      <stop offset="60%" stop-color="#0284c7" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#070b14" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="plume" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7"/>
+      <stop offset="55%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#bae6fd"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <rect width="1920" height="1080" fill="url(#glow)"/>
+  <!-- Subtle ambient geometric waves -->
+  <path d="M0 780 Q480 680 960 760 T1920 700 L1920 1080 L0 1080 Z" fill="#0b1324" opacity="0.7"/>
+  <path d="M0 860 Q540 790 1080 850 T1920 810 L1920 1080 L0 1080 Z" fill="#09101f" opacity="0.85"/>
+  <!-- Minimal stylized feather emblem -->
+  <g transform="translate(960 470)">
+    <path d="M-95 105 C-65 15, 25 -85, 118 -118 C92 -28, 34 44, -45 86 C-62 95, -78 100, -95 105 Z" fill="url(#plume)" opacity="0.92"/>
+    <path d="M-112 128 C-54 68, 12 4, 112 -112" stroke="#e0f2fe" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.85"/>
+    <path d="M-18 22 L38 -8 M8 -8 L64 -42 M-44 52 L10 26" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round" opacity="0.55"/>
+  </g>
+  <text x="960" y="655" text-anchor="middle" fill="#e2e8f0" font-family="DejaVu Sans, Sans, Arial" font-size="34" font-weight="600" letter-spacing="8">FEATHEROS</text>
+  <text x="960" y="692" text-anchor="middle" fill="#64748b" font-family="DejaVu Sans, Sans, Arial" font-size="14" letter-spacing="4">LIGHTWEIGHT  •  WINDOWS-COMPATIBLE</text>
+</svg>

@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Directory
+Name=Windows Apps
+Comment=Windows software installed inside FeatherOS bottles
+Icon=application-x-ms-dos-executable
