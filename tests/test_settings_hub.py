@@ -8,8 +8,12 @@ from pathlib import Path
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+import xml.etree.ElementTree as ET
 
-from featheros.settings_hub import SECTIONS, SettingsController, main as settings_main
+from featheros.fluent_theme import escape_pango
+from featheros.runners import RUNTIME_PRESETS
+from featheros.settings_hub import SECTIONS, SETTINGS_ACTIONS, SettingsController, main as settings_main
+from featheros.store import CATALOG
 
 
 class TestFeatherSettingsHub(unittest.TestCase):
@@ -48,6 +52,24 @@ class TestFeatherSettingsHub(unittest.TestCase):
             rc = settings_main(["open", "sound", "--dry-run"])
         self.assertEqual(rc, 0)
         self.assertIn("pavucontrol", buf.getvalue())
+
+    def test_all_gtk_pango_markup_strings_are_valid_xml(self) -> None:
+        # Regression guard: unescaped '&' (e.g. 'Display & Resolution') broke GTK3 Pango markup!
+        for _sid, label in SECTIONS:
+            ET.fromstring(f"<m><b><big>{escape_pango(label)}</big></b></m>")
+        for act in SETTINGS_ACTIONS:
+            ET.fromstring(
+                f"<m><b>{escape_pango(act.title)}</b>\n<small>{escape_pango(act.description)}</small></m>"
+            )
+        for app in CATALOG:
+            ET.fromstring(
+                f"<m><b>{escape_pango(app.name)}</b> <small>({escape_pango(app.size_hint)})</small>\n"
+                f"<small>{escape_pango(app.summary)}</small></m>"
+            )
+        for preset in RUNTIME_PRESETS:
+            ET.fromstring(
+                f"<m><b>{escape_pango(preset.label)}</b>\n<small>{escape_pango(preset.description)}</small></m>"
+            )
 
 
 if __name__ == "__main__":

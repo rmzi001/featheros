@@ -43,7 +43,7 @@ class TestFeatherSelftest(unittest.TestCase):
                     return 0, ""
                 if "swapon" in cmd[0]:
                     return 0, "/dev/zram0 partition 1G 0B 100"
-                if "echo FEATHEROS_WIN32_OK" in cmd:
+                if "FEATHEROS_WIN32_OK" in cmd:
                     return 0, "FEATHEROS_WIN32_OK"
                 return 0, ""
 

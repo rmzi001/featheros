@@ -21,7 +21,7 @@ from .ctl import (
     get_active_profile,
     get_theme_mode,
 )
-from .fluent_theme import apply_fluent_gtk_theme
+from .fluent_theme import apply_fluent_gtk_theme, escape_pango
 from .system_probe import SystemProbe, probe_system
 
 
@@ -357,7 +357,7 @@ def _run_gtk_settings(controller: SettingsController) -> int:
 
             brand = Gtk.Label(xalign=0)
             brand.set_markup(
-                f"<b><big>Settings</big></b>\n<small>FeatherOS v{__version__} ({__codename__})</small>"
+                f"<b><big>Settings</big></b>\n<small>FeatherOS v{escape_pango(__version__)} ({escape_pango(__codename__)})</small>"
             )
             sidebar_box.pack_start(brand, False, False, 0)
 
@@ -420,7 +420,7 @@ def _run_gtk_settings(controller: SettingsController) -> int:
 
         def _render_search(self, query: str) -> None:
             self._clear_cards()
-            self.section_header.set_markup(f"<b><big>Search: {query}</big></b>")
+            self.section_header.set_markup(f"<b><big>Search: {escape_pango(query)}</big></b>")
             for item in controller.list_actions(query=query):
                 self._add_action_card(item)
             self.cards_box.show_all()
@@ -429,7 +429,10 @@ def _run_gtk_settings(controller: SettingsController) -> int:
             card = Gtk.Box(spacing=12)
             card.get_style_context().add_class("feather-card")
             txt = Gtk.Label(xalign=0)
-            txt.set_markup(f"<b>{item['title']}</b>\n<small>{item['description']}</small>")
+            txt.set_markup(
+                f"<b>{escape_pango(item['title'])}</b>\n"
+                f"<small>{escape_pango(item['description'])}</small>"
+            )
             btn = Gtk.Button(label="Open")
             btn.connect("clicked", self._on_open_action, item["id"])
             card.pack_start(txt, True, True, 0)
@@ -439,7 +442,7 @@ def _run_gtk_settings(controller: SettingsController) -> int:
         def _render_section(self, section_id: str) -> None:
             self._clear_cards()
             sec_label = dict(SECTIONS).get(section_id, section_id.title())
-            self.section_header.set_markup(f"<b><big>{sec_label}</big></b>")
+            self.section_header.set_markup(f"<b><big>{escape_pango(sec_label)}</big></b>")
 
             if section_id == "system":
                 st = controller.summary()
@@ -459,9 +462,9 @@ def _run_gtk_settings(controller: SettingsController) -> int:
                 banner.get_style_context().add_class("feather-card")
                 info_lbl = Gtk.Label(xalign=0)
                 info_lbl.set_markup(
-                    f"<b>About This PC — FeatherOS {__version__} ({__codename__})</b>\n"
-                    f"<small>CPUs: {sys_info['cpu_count']}  •  Memory: {ram_text}  •  Storage: {disk_text}\n"
-                    f"Active Profile: {prof['label']}  •  Graphics: {controller.probe.recommended_graphics_backend.upper()}  •  Bottles: {st['bottles_count']}</small>"
+                    f"<b>About This PC — FeatherOS {escape_pango(__version__)} ({escape_pango(__codename__)})</b>\n"
+                    f"<small>CPUs: {escape_pango(sys_info['cpu_count'])}  •  Memory: {escape_pango(ram_text)}  •  Storage: {escape_pango(disk_text)}\n"
+                    f"Active Profile: {escape_pango(prof['label'])}  •  Graphics: {escape_pango(controller.probe.recommended_graphics_backend.upper())}  •  Bottles: {escape_pango(st['bottles_count'])}</small>"
                 )
                 banner.pack_start(info_lbl, False, False, 0)
 

@@ -11,10 +11,12 @@ from __future__ import annotations
 import argparse
 from dataclasses import asdict, dataclass
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 from typing import Any, Callable, Sequence
 
 from . import __codename__, __version__
@@ -60,6 +62,19 @@ class CheckResult:
 
 
 def _default_run(cmd: list[str], timeout: int = 20) -> tuple[int, str]:
+    env = os.environ.copy()
+    if cmd and "wine" in Path(cmd[0]).name.lower():
+        env.setdefault("WINEDEBUG", "-all")
+        env.setdefault("WINEDLLOVERRIDES", "mscoree,mshtml=")
+        xdg = env.get("XDG_RUNTIME_DIR", "")
+        if not xdg or not Path(xdg).is_dir():
+            rt_dir = Path(tempfile.gettempdir()) / f"feather-xdg-{os.getuid() if hasattr(os, 'getuid') else 0}"
+            rt_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                rt_dir.chmod(0o700)
+            except OSError:
+                pass
+            env["XDG_RUNTIME_DIR"] = str(rt_dir)
     try:
         proc = subprocess.run(
             cmd,
@@ -67,6 +82,7 @@ def _default_run(cmd: list[str], timeout: int = 20) -> tuple[int, str]:
             stderr=subprocess.STDOUT,
             text=True,
             timeout=timeout,
+            env=env,
             check=False,
         )
         return proc.returncode, proc.stdout.strip()
@@ -246,9 +262,9 @@ def run_selftest(
     # 10. Live Win32 execution smoke test via Wine cmd.exe (10 pts)
     if run_wine_smoke and sys_probe.can_run_wine:
         wine_bin = sys_probe.wine_path or sys_probe.wine64_path or "wine"
-        rc, out = run_cmd([wine_bin, "cmd", "/c", "echo FEATHEROS_WIN32_OK"], 45)
+        rc, out = run_cmd([wine_bin, "cmd", "/c", "echo", "FEATHEROS_WIN32_OK"], 45)
         win32_ok = rc == 0 and "FEATHEROS_WIN32_OK" in out
-        win32_detail = "Win32 cmd.exe returned FEATHEROS_WIN32_OK" if win32_ok else f"rc={rc}: {out[:120]}"
+        win32_detail = "Win32 cmd.exe returned FEATHEROS_WIN32_OK" if win32_ok else f"rc={rc}: {out[:160]}"
     elif not run_wine_smoke:
         win32_ok = sys_probe.can_run_wine
         win32_detail = "Skipped live Wine exec (--quick); Wine binary detected"

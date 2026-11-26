@@ -1,0 +1,2 @@
+# Hide legacy/phantom VM floppy drives from Thunar & XFCE desktop icons
+KERNEL=="fd[0-9]*", ENV{UDISKS_IGNORE}="1"

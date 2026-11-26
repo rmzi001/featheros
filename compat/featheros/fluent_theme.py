@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
+import html
 import json
 import os
 from pathlib import Path
+
+
+def escape_pango(text: object) -> str:
+    """Escape &, <, > for safe GTK3 / Pango set_markup() labels."""
+    return html.escape(str(text), quote=False)
 
 FLUENT_DARK_GTK_CSS = """
 window, .background {

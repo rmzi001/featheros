@@ -20,7 +20,7 @@ from .bottles import (
     VALID_WINDOWS_VERSIONS,
 )
 from .ctl import PROFILES, apply_profile, collect_system_status, get_active_profile
-from .fluent_theme import apply_fluent_gtk_theme
+from .fluent_theme import apply_fluent_gtk_theme, escape_pango
 from .runners import RUNTIME_PRESETS, InstalledRunner, list_installed_runners
 from .shortcuts import WindowsShortcut, discover_bottle_shortcuts, prune_bottle_shortcuts, sync_bottle_shortcuts
 from .system_probe import SystemProbe, probe_system
@@ -273,7 +273,9 @@ def _run_gtk_gui(controller: CompatController) -> int:
                 row = Gtk.Box(spacing=10)
                 row.get_style_context().add_class("feather-card")
                 lbl = Gtk.Label(xalign=0)
-                lbl.set_markup(f"<b>{preset.label}</b>\n<small>{preset.description}</small>")
+                lbl.set_markup(
+                    f"<b>{escape_pango(preset.label)}</b>\n<small>{escape_pango(preset.description)}</small>"
+                )
                 btn = Gtk.Button(label="Install")
                 btn.get_style_context().add_class("feather-primary")
                 btn.connect("clicked", self._on_install_runtime, preset.id)
@@ -323,7 +325,7 @@ def _run_gtk_gui(controller: CompatController) -> int:
             self.selected_slug = b.slug
             apps = controller.list_apps(b.slug)
             self.lbl_bottle_title.set_markup(
-                f"<b>Bottle: {b.name}</b>  <small>[{b.arch}] — {len(apps)} discovered apps</small>"
+                f"<b>Bottle: {escape_pango(b.name)}</b>  <small>[{escape_pango(b.arch)}] — {len(apps)} discovered apps</small>"
             )
             self.cmb_winver.set_active_id(b.windows_version)
             self.chk_dxvk.set_active(b.dxvk)
@@ -354,10 +356,10 @@ def _run_gtk_gui(controller: CompatController) -> int:
             s = st["system"]
             p = st["active_profile"]
             self.lbl_diag.set_markup(
-                f"<b>Active Profile:</b> {p['label']} — {p['description']}\n"
-                f"<b>Vulkan Hardware:</b> {s['vulkan_hardware_ready']} ({s['vulkan_device_name'] or 'none'})\n"
-                f"<b>32-bit Multiarch:</b> {s['multiarch_i386']}\n"
-                f"<b>Installed Runners:</b> {', '.join(r['name'] for r in st['runners'])}"
+                f"<b>Active Profile:</b> {escape_pango(p['label'])} — {escape_pango(p['description'])}\n"
+                f"<b>Vulkan Hardware:</b> {escape_pango(s['vulkan_hardware_ready'])} ({escape_pango(s['vulkan_device_name'] or 'none')})\n"
+                f"<b>32-bit Multiarch:</b> {escape_pango(s['multiarch_i386'])}\n"
+                f"<b>Installed Runners:</b> {escape_pango(', '.join(r['name'] for r in st['runners']))}"
             )
 
         def _on_launch_discovered(self, _btn: Any, target: str) -> None:

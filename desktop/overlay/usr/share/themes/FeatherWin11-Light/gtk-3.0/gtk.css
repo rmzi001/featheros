@@ -63,3 +63,19 @@ button:hover {
     border-radius: 20px;
     padding: 6px 14px;
 }
+
+.xfce4-panel #showdesktop-button, .xfce4-panel button.showdesktop {
+    min-width: 10px;
+    padding: 0 3px;
+    border-left: 1px solid rgba(15, 23, 42, 0.16);
+    border-radius: 0;
+    margin: 6px 0 6px 4px;
+}
+
+.xfce4-panel #showdesktop-button image {
+    opacity: 0;
+}
+
+XfdesktopIconView.view {
+    -XfdesktopIconView-ellipsize-icon-labels: 0;
+}

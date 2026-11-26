@@ -15,7 +15,7 @@ from typing import Any, Callable, Sequence
 
 from . import __codename__, __version__
 from .ctl import collect_system_status, get_config_dir
-from .fluent_theme import apply_fluent_gtk_theme
+from .fluent_theme import apply_fluent_gtk_theme, escape_pango
 from .runners import install_ge_proton, list_installed_runners
 from .system_probe import SystemProbe, probe_system
 
@@ -389,8 +389,8 @@ def _run_gtk_store(controller: StoreController) -> int:
                     row.get_style_context().add_class("feather-card")
                     lbl = Gtk.Label(xalign=0)
                     lbl.set_markup(
-                        f"<b>{item['name']}</b>  <small>({item['size_hint']})</small>\n"
-                        f"<small>{item['summary']}</small>"
+                        f"<b>{escape_pango(item['name'])}</b>  <small>({escape_pango(item['size_hint'])})</small>\n"
+                        f"<small>{escape_pango(item['summary'])}</small>"
                     )
                     row.pack_start(lbl, True, True, 0)
                     if item["installed"]:
