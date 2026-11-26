@@ -93,7 +93,7 @@ mksquashfs "${ROOTFS_DIR}" "${ISO_STAGE}/live/filesystem.squashfs" \
 echo "[6/6] Generating hybrid UEFI + BIOS GRUB bootloaders and ISO..."
 cat > "${ISO_STAGE}/boot/grub/grub.cfg" <<EOF
 set default=0
-set timeout=5
+set timeout=3
 
 insmod all_video
 insmod gfxterm
@@ -114,11 +114,18 @@ menuentry "${OS_PRETTY_NAME} — Copy to RAM (Ultra Fast)" {
 }
 EOF
 
-# Embedded GRUB config that locates the ISO volume and loads /boot/grub/grub.cfg
+# Embedded GRUB config that locates the ISO/USB root reliably by file path
+# Keep $prefix pointing at (memdisk)/boot/grub so insmod resolves embedded modules cleanly.
 cat > "${WORK_DIR}/grub-embed.cfg" <<EOF
-search --no-floppy --set=root --label ${ISO_LABEL}
-set prefix=(\$root)/boot/grub
-configfile \$prefix/grub.cfg
+insmod iso9660
+insmod part_msdos
+insmod part_gpt
+insmod fat
+insmod search_fs_file
+insmod search
+insmod configfile
+search --no-floppy --set=root --file /live/vmlinuz
+configfile (\$root)/boot/grub/grub.cfg
 EOF
 
 # Build UEFI boot image
@@ -138,12 +145,12 @@ mcopy -i "${ISO_STAGE}/boot/grub/efiboot.img" "${WORK_DIR}/bootx64.efi" ::/EFI/B
 mkdir -p "${ISO_STAGE}/EFI/BOOT"
 cp "${WORK_DIR}/bootx64.efi" "${ISO_STAGE}/EFI/BOOT/BOOTX64.EFI"
 
-# Build Legacy BIOS boot image
+# Build Legacy BIOS boot image with full module set required to locate /live/vmlinuz and boot Linux
 grub-mkstandalone \
   --format=i386-pc \
   --output="${WORK_DIR}/core.img" \
-  --install-modules="linux normal iso9660 biosdisk memdisk search tar ls" \
-  --modules="linux normal iso9660 biosdisk search" \
+  --install-modules="linux normal iso9660 biosdisk memdisk tar ls search search_label search_fs_file configfile part_msdos part_gpt fat ext2 all_video gfxterm font terminal echo test sleep boot vbe vga" \
+  --modules="linux normal iso9660 biosdisk search search_fs_file configfile" \
   --locales="" \
   --fonts="" \
   "boot/grub/grub.cfg=${WORK_DIR}/grub-embed.cfg"
