@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   verify:
-    name: Test FeatherRun, Overlay & Build Scripts
+    name: Test FeatherRun, Selftest, Overlay & Build Scripts
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -30,6 +30,7 @@ jobs:
       - name: Unpack source update archive if present
         run: |
           if [ -f featheros-src.tar.gz ]; then
+            find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' ! -name 'featheros-src.tar.gz' -exec rm -rf {} +
             tar -xzf featheros-src.tar.gz --exclude='.github/workflows*'
             rm -f featheros-src.tar.gz
             git config user.name "FeatherOS CI"
@@ -46,22 +47,24 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Run Python unit & overlay tests
+      - name: Run Python unit, selftest & overlay tests
         run: python3 -m unittest discover -s tests -t . -v
 
       - name: Run build integrity validator
         run: python3 scripts/validate-build.py
 
-      - name: Check bash syntax of build and VM scripts
+      - name: Check shell syntax of build, VM and overlay scripts
         run: |
           bash -n build/build-iso.sh
           bash -n build/chroot-setup.sh
           bash -n scripts/run-qemu.sh
-          sh -n desktop/overlay/etc/xdg/openbox/autostart
           sh -n desktop/overlay/usr/local/bin/feather-firstboot
+          sh -n desktop/overlay/usr/local/bin/feather-polkit-agent
+          sh -n desktop/overlay/usr/local/bin/feather-calamares
+          sh -n desktop/overlay/usr/local/bin/feather-boot-report
 
   build-iso:
-    name: Build Bootable FeatherOS ISO & QEMU Boot-Test
+    name: Build Bootable FeatherOS ISO & KVM QA Boot-Test
     needs: verify
     if: >-
       (github.event_name == 'workflow_dispatch' && inputs.build_iso) ||
@@ -77,6 +80,7 @@ jobs:
       - name: Ensure source unpacked
         run: |
           if [ -f featheros-src.tar.gz ]; then
+            find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' ! -name 'featheros-src.tar.gz' -exec rm -rf {} +
             tar -xzf featheros-src.tar.gz --exclude='.github/workflows*'
             rm -f featheros-src.tar.gz
           fi
@@ -105,7 +109,7 @@ jobs:
           sudo -E bash build/build-iso.sh
           sudo chown -R "$(id -u):$(id -g)" dist
 
-      - name: Boot-test FeatherOS ISO in QEMU & capture live desktop screenshots
+      - name: Boot-test FeatherOS ISO in KVM QEMU, exercise UI & verify feather-selftest
         run: |
           set -euo pipefail
           ISO_FILE="$(ls dist/featheros-*.iso | head -n 1)"
@@ -142,10 +146,29 @@ jobs:
           echo "screendump dist/boot-early.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock
           sleep "${WAIT_DESKTOP}"
           echo "screendump dist/boot-desktop.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock
+
+          # Exercise Whisker Start Menu (Win key) and FeatherSettings (Win+I) live inside VM
+          echo "sendkey meta_l" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+          sleep 3
+          echo "screendump dist/boot-startmenu.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+          echo "sendkey esc" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+          sleep 2
+          echo "sendkey meta_l-i" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+          sleep 5
+          echo "screendump dist/boot-settings.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+
+          # Wait up to 30s for in-OS feather-boot-report QA scorecard to finish writing to ttyS0
+          for _ in $(seq 1 30); do
+            if grep -q "FEATHEROS_QA_REPORT_END" dist/qemu-serial.log 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
           echo "quit" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
           wait "${QEMU_PID}" || true
 
-          for f in dist/boot-early.ppm dist/boot-desktop.ppm; do
+          for f in dist/boot-early.ppm dist/boot-desktop.ppm dist/boot-startmenu.ppm dist/boot-settings.ppm; do
             if [ -s "${f}" ]; then
               pnmtopng "${f}" > "${f%.ppm}.png"
               rm -f "${f}"
@@ -154,17 +177,21 @@ jobs:
 
           echo "=== Output directory contents ==="
           ls -lh dist/
-          echo "=== Head of qemu-serial.log ==="
-          head -n 30 dist/qemu-serial.log || true
+          echo "=== In-OS QA Checking Agent Report (from /dev/ttyS0) ==="
+          sed -n '/FEATHEROS_QA_REPORT_BEGIN/,/FEATHEROS_QA_REPORT_END/p' dist/qemu-serial.log || true
           echo "=== Tail of qemu-serial.log ==="
-          tail -n 50 dist/qemu-serial.log || true
+          tail -n 40 dist/qemu-serial.log || true
 
-          # Empirical check: verify screenshots exist and serial log captured systemd + LightDM/login boot
+          # Empirical checks: screenshots, serial boot, in-OS QA scorecard & live Wine Win32 execution
           test -s dist/boot-early.png
           test -s dist/boot-desktop.png
+          test -s dist/boot-startmenu.png
+          test -s dist/boot-settings.png
           test -s dist/qemu-serial.log
           grep -Eq "featheros login:|lightdm\.service|Reached target" dist/qemu-serial.log
-          echo "=== FeatherOS QEMU Boot-Test PASSED ==="
+          grep -q "FEATHEROS_SELFTEST_SCORE:" dist/qemu-serial.log
+          grep -q "FEATHEROS_WIN32_OK" dist/qemu-serial.log
+          echo "=== FeatherOS KVM QEMU Boot-Test & In-OS QA Checking Agent PASSED ==="
 
       - name: Upload QEMU boot-test proof (screenshots, serial log & checksum)
         if: always()
@@ -193,9 +220,9 @@ jobs:
           source config/featheros.conf
           TAG="v${OS_VERSION}"
           TITLE="${OS_PRETTY_NAME}"
-          NOTES="Windows 11 Dark Glass lightweight Debian OS (XFCE 4.20 + centered taskbar + Whisker Start Menu + FeatherSettings + FeatherRun Windows .exe/.msi compatibility + FeatherStore + Calamares installer). Includes live KVM QEMU boot-test screenshots."
+          NOTES="Windows 11 Dark & Light Glass lightweight Debian OS (XFCE 4.20 + custom Fluent XFWM4 borders + centered taskbar + Whisker Start Menu + FeatherSettings + FeatherRun Windows .exe/.msi compatibility + FeatherStore + bootable Calamares installer + feather-selftest QA Checking Agent). Verified live in KVM QEMU with desktop, Start Menu, Settings screenshots and live Wine Win32 cmd.exe execution."
           if gh release view "${TAG}" >/dev/null 2>&1; then
-            gh release upload "${TAG}" dist/featheros-*.iso dist/featheros-*.sha256 dist/boot-early.png dist/boot-desktop.png dist/qemu-serial.log --clobber
+            gh release upload "${TAG}" dist/featheros-*.iso dist/featheros-*.sha256 dist/boot-*.png dist/qemu-serial.log --clobber
           else
-            gh release create "${TAG}" dist/featheros-*.iso dist/featheros-*.sha256 dist/boot-early.png dist/boot-desktop.png dist/qemu-serial.log --title "${TITLE}" --notes "${NOTES}"
+            gh release create "${TAG}" dist/featheros-*.iso dist/featheros-*.sha256 dist/boot-*.png dist/qemu-serial.log --title "${TITLE}" --notes "${NOTES}"
           fi
