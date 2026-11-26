@@ -1,9 +1,0 @@
-# FeatherOS Start Menu bottom system & power controls
-^sep(System & Power)
-Profile: Balanced,feather-ctl profile balanced,preferences-system
-Profile: Low-RAM Saver,feather-ctl profile low-ram,preferences-system-performance
-Profile: Gaming Mode,feather-ctl profile gaming,applications-games
-System Diagnostics,lxterminal -e sh -c 'feather-ctl status; echo; feather-run doctor; read -p "Press Enter to close..."',utilities-system-monitor
-Log Out,openbox --exit,system-log-out
-Reboot,systemctl reboot,system-reboot
-Shut Down,systemctl poweroff,system-shutdown

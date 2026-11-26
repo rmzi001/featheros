@@ -39,6 +39,8 @@ class TestBuildPipeline(unittest.TestCase):
         self.assertIn("/usr/local/bin/feather-ctl", text)
         self.assertIn("/usr/local/bin/feather-store", text)
         self.assertIn("/usr/local/bin/feather-settings", text)
+        self.assertIn("/usr/local/bin/feather-selftest", text)
+        self.assertIn("feather-boot-report", text)
         self.assertIn("plymouth-set-default-theme featheros", text)
 
     def test_ci_workflow_runs_tests_and_builds_iso(self) -> None:

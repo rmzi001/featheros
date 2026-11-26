@@ -176,6 +176,14 @@ class TestPEInspector(unittest.TestCase):
             self.assertFalse(info.valid)
             self.assertEqual(info.file_type, "unknown")
 
+    def test_arm64_pe_rejected_on_x86_64(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            arm_exe = make_synthetic_pe(Path(tmp) / "armapp.exe", machine=0xAA64, opt_magic=0x20B, subsystem=2)
+            info = inspect_binary(arm_exe)
+            self.assertFalse(info.valid)
+            self.assertEqual(info.arch, "arm64")
+            self.assertIn("Unsupported", info.error or "")
+
 
 class TestSystemProbe(unittest.TestCase):
     def test_probe_hardware_vulkan_and_meminfo(self) -> None:
@@ -265,6 +273,12 @@ class TestBottleManagerAndLaunchPlan(unittest.TestCase):
             cmd, env = mgr.build_winetricks_command("mycooltool", ["vcrun2022", "corefonts"])
             self.assertEqual(cmd, ["winetricks", "-q", "vcrun2022", "corefonts"])
             self.assertTrue(env["WINEPREFIX"].endswith("prefix"))
+
+            # Verify apply_settings generates real winecfg + LogPixels DPI commands
+            mgr.update_bottle("mycooltool", windows_version="win11", dpi=120)
+            cmds, _senv = mgr.build_apply_settings_commands("mycooltool", probe=make_mock_probe(vulkan_hw=True))
+            self.assertTrue(any("winecfg" in c and "win11" in c for c in cmds))
+            self.assertTrue(any("LogPixels" in c and "120" in c for c in cmds))
 
 
 class TestShortcutsAndLnkParser(unittest.TestCase):

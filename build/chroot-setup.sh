@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FeatherOS v0.2.0 chroot provisioning script (runs inside target Debian rootfs)
+# FeatherOS v0.3.0 chroot provisioning script (runs inside target Debian rootfs)
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
@@ -29,11 +29,11 @@ read_pkg_list() {
   grep -Ev '^\s*(#|$)' "$1"
 }
 
-echo "[FeatherOS chroot] Installing core XFCE 4.20 + Wine packages (--no-install-recommends)..."
+echo "[FeatherOS chroot] Installing core XFCE 4.20 + Wine + GRUB2 packages (--no-install-recommends)..."
 mapfile -t CORE_PKGS < <(read_pkg_list "${BUILD_TMP}/packages-core.list")
 apt-get install -y --no-install-recommends "${CORE_PKGS[@]}"
 
-echo "[FeatherOS chroot] Installing optional apps, Bluetooth/audio tools, firmware & gaming extras..."
+echo "[FeatherOS chroot] Installing optional apps, Bluetooth, firmware, Calamares & gaming extras..."
 mapfile -t OPT_PKGS < <(read_pkg_list "${BUILD_TMP}/packages-optional.list")
 for pkg in "${OPT_PKGS[@]}"; do
   if apt-cache show "${pkg}" >/dev/null 2>&1; then
@@ -44,12 +44,16 @@ for pkg in "${OPT_PKGS[@]}"; do
   fi
 done
 
-echo "[FeatherOS chroot] Applying FeatherShell v0.2 Windows 11 Dark Glass overlay..."
+echo "[FeatherOS chroot] Applying FeatherShell v0.3 Windows 11 Dark/Light Glass overlay..."
 cp -a "${BUILD_TMP}/overlay/." /
 cp -f /etc/featheros-release /etc/os-release
-chmod +x /usr/local/bin/feather-firstboot /etc/xdg/openbox/autostart
+chmod 0755 \
+  /usr/local/bin/feather-firstboot \
+  /usr/local/bin/feather-polkit-agent \
+  /usr/local/bin/feather-calamares \
+  /usr/local/bin/feather-boot-report
 
-echo "[FeatherOS chroot] Installing FeatherRun / FeatherCompat / FeatherSettings / FeatherStore / FeatherCtl..."
+echo "[FeatherOS chroot] Installing FeatherRun / FeatherCompat / FeatherSettings / FeatherStore / FeatherCtl / FeatherSelftest..."
 rm -rf /usr/lib/python3/dist-packages/featheros
 cp -a "${BUILD_TMP}/compat/featheros" /usr/lib/python3/dist-packages/featheros
 
@@ -83,12 +87,19 @@ from featheros.settings_hub import main
 raise SystemExit(main())
 EOF
 
+cat > /usr/local/bin/feather-selftest <<'EOF'
+#!/usr/bin/env python3
+from featheros.selftest import main
+raise SystemExit(main())
+EOF
+
 chmod 0755 \
   /usr/local/bin/feather-run \
   /usr/local/bin/feather-compat \
   /usr/local/bin/feather-ctl \
   /usr/local/bin/feather-store \
-  /usr/local/bin/feather-settings
+  /usr/local/bin/feather-settings \
+  /usr/local/bin/feather-selftest
 
 echo "[FeatherOS chroot] Configuring live user '${LIVE_USER}'..."
 if ! id -u "${LIVE_USER}" >/dev/null 2>&1; then
@@ -99,7 +110,7 @@ echo "root:feather" | chpasswd
 echo "${LIVE_USER} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/90-${LIVE_USER}"
 chmod 0440 "/etc/sudoers.d/90-${LIVE_USER}"
 
-# Apply Windows 11 Dark Glass skeleton configs to live user home
+# Apply Windows 11 Dark/Light Glass skeleton configs to live user home
 cp -a /etc/skel/. "/home/${LIVE_USER}/"
 chown -R "${LIVE_USER}:${LIVE_USER}" "/home/${LIVE_USER}"
 
@@ -108,7 +119,7 @@ sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen || true
 locale-gen || true
 echo 'LANG=en_US.UTF-8' > /etc/default/locale
 
-systemctl enable lightdm NetworkManager zramswap || true
+systemctl enable lightdm NetworkManager zramswap feather-boot-report || true
 systemctl enable bluetooth || true
 
 # Disable slow background timers during live boot for snappier responsiveness

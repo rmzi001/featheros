@@ -1,4 +1,4 @@
-"""Wine / GE-Proton runner discovery, safe extraction, and runtime presets."""
+"""Wine / GE-Proton runner discovery, safe extraction, installer, and runtime presets."""
 
 from __future__ import annotations
 
@@ -6,9 +6,11 @@ from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
 import tarfile
+import tempfile
 from typing import Any, Callable
 import urllib.request
 
+from . import __version__
 from .bottles import get_featheros_home
 
 GE_PROTON_RELEASES_API = (
@@ -152,7 +154,7 @@ def fetch_latest_ge_proton(
     if fetcher is None:
         req = urllib.request.Request(
             GE_PROTON_RELEASES_API,
-            headers={"User-Agent": "FeatherOS-RunnerManager/0.1"},
+            headers={"User-Agent": f"FeatherOS-RunnerManager/{__version__}"},
         )
         with urllib.request.urlopen(req, timeout=15) as resp:
             raw = resp.read()
@@ -163,8 +165,15 @@ def fetch_latest_ge_proton(
     return parse_ge_proton_release(payload)
 
 
+def _ensure_within(dest: Path, candidate: Path, label: str) -> None:
+    try:
+        candidate.relative_to(dest)
+    except ValueError as exc:
+        raise ValueError(f"Unsafe path in archive: {label}") from exc
+
+
 def safe_extract_tarball(archive_path: str | Path, dest_dir: str | Path) -> Path:
-    """Safely extract a runner .tar.gz archive, blocking path traversal."""
+    """Safely extract a runner .tar.gz archive, blocking path & symlink traversal."""
     archive = Path(archive_path)
     dest = Path(dest_dir).resolve()
     dest.mkdir(parents=True, exist_ok=True)
@@ -172,8 +181,41 @@ def safe_extract_tarball(archive_path: str | Path, dest_dir: str | Path) -> Path
     with tarfile.open(archive, "r:*") as tf:
         for member in tf.getmembers():
             member_path = (dest / member.name).resolve()
-            if not str(member_path).startswith(str(dest)):
-                raise ValueError(f"Unsafe path in archive: {member.name}")
-        tf.extractall(dest)
+            _ensure_within(dest, member_path, member.name)
+            if member.issym() or member.islnk():
+                link_target = (member_path.parent / member.linkname).resolve()
+                _ensure_within(dest, link_target, f"{member.name} -> {member.linkname}")
+        if hasattr(tarfile, "data_filter"):
+            tf.extractall(dest, filter="data")
+        else:
+            tf.extractall(dest)
 
     return dest
+
+
+def install_ge_proton(
+    *,
+    home: str | Path | None = None,
+    fetcher: Callable[[str], bytes] | None = None,
+    downloader: Callable[[str, Path], None] | None = None,
+) -> ReleaseAsset:
+    """Download and safely extract the latest GE-Proton runner into FEATHEROS_HOME/runners."""
+    asset = fetch_latest_ge_proton(fetcher=fetcher)
+    runners_dir = get_featheros_home(home) / "runners"
+    runners_dir.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        archive_path = Path(tmp) / asset.asset_name
+        if downloader is not None:
+            downloader(asset.download_url, archive_path)
+        else:
+            req = urllib.request.Request(
+                asset.download_url,
+                headers={"User-Agent": f"FeatherOS-RunnerManager/{__version__}"},
+            )
+            with urllib.request.urlopen(req, timeout=300) as resp, archive_path.open("wb") as out:
+                while chunk := resp.read(1024 * 1024):
+                    out.write(chunk)
+        safe_extract_tarball(archive_path, runners_dir)
+
+    return asset

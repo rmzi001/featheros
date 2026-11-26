@@ -1,17 +1,15 @@
-"""feather-compat: Lightweight Compatibility Manager GUI for FeatherOS.
-
-Uses native GTK3 (PyGObject) on FeatherOS Linux (~25-35 MB RAM) and automatically
-falls back to a modern dark-themed Tkinter UI when GTK3 is unavailable (e.g., when
-previewing or developing directly on Windows).
-"""
+"""feather-compat: Lightweight Compatibility Manager GUI for FeatherOS (v0.3.0)."""
 
 from __future__ import annotations
 
 import argparse
 import os
 from pathlib import Path
+import shlex
+import shutil
 import subprocess
 import sys
+import threading
 from typing import Any, Sequence
 
 from . import __version__
@@ -42,7 +40,6 @@ class CompatController:
         self.config_dir = config_dir
         self.manager = BottleManager(home=home)
         self.probe = probe or probe_system()
-        # Ensure a default bottle always exists for instant first-time usability
         self.manager.ensure_bottle("default")
 
     def list_bottles(self) -> list[BottleConfig]:
@@ -69,7 +66,15 @@ class CompatController:
         )
 
     def update_bottle(self, slug: str, **kwargs: Any) -> BottleConfig:
-        return self.manager.update_bottle(slug, **kwargs)
+        cfg = self.manager.update_bottle(slug, **kwargs)
+        if self.probe.can_run_wine:
+            threading.Thread(
+                target=self.manager.apply_bottle_settings,
+                args=(cfg.slug,),
+                kwargs={"probe": self.probe},
+                daemon=True,
+            ).start()
+        return cfg
 
     def delete_bottle(self, slug: str) -> bool:
         if slug == "default":
@@ -88,7 +93,7 @@ class CompatController:
         return self.manager.build_launch_plan(target, bottle_name=bottle_slug, probe=self.probe)
 
     def launch_binary(self, target: str | Path, bottle_slug: str) -> tuple[LaunchPlan, bool, str]:
-        """Build a launch plan and spawn the process if Wine is available."""
+        """Build a launch plan, apply prefix settings if needed, launch, and sync shortcuts."""
         plan = self.plan_launch(target, bottle_slug)
         if not plan.binary_info.valid:
             return plan, False, f"Invalid binary: {plan.binary_info.error}"
@@ -102,7 +107,15 @@ class CompatController:
         self.manager.touch_last_used(plan.bottle.slug)
         merged = os.environ.copy()
         merged.update(plan.env)
-        subprocess.Popen(plan.command, env=merged)
+
+        def _spawn_and_sync() -> None:
+            if not (plan.prefix_path / "system.reg").is_file():
+                self.manager.apply_bottle_settings(plan.bottle.slug, probe=self.probe)
+            proc = subprocess.Popen(plan.command, env=merged)
+            proc.wait()
+            sync_bottle_shortcuts(self.manager, plan.bottle.slug)
+
+        threading.Thread(target=_spawn_and_sync, daemon=True).start()
         note = f" ({'; '.join(plan.notices)})" if plan.notices else ""
         return plan, True, f"Launched {Path(target).name} [{plan.effective_backend}]{note}"
 
@@ -115,7 +128,13 @@ class CompatController:
             return False, f"winetricks not installed on this host. Would run: {' '.join(cmd)}"
         merged = os.environ.copy()
         merged.update(env)
-        subprocess.Popen(cmd, env=merged)
+        term = shutil.which("xfce4-terminal")
+        if term:
+            cmd_str = " ".join(shlex.quote(c) for c in cmd)
+            shell_cmd = f"{cmd_str}; echo; read -r -p 'Runtime install complete. Press Enter...' _"
+            subprocess.Popen([term, "-x", "bash", "-c", shell_cmd], env=merged)
+        else:
+            subprocess.Popen(cmd, env=merged)
         return True, f"Installing {preset.label} into bottle '{bottle_slug}'..."
 
     def list_runners(self) -> list[InstalledRunner]:
@@ -139,34 +158,36 @@ def _run_gtk_gui(controller: CompatController) -> int:
     class FeatherCompatWindow(Gtk.Window):
         def __init__(self) -> None:
             super().__init__(title=f"FeatherOS Compatibility Manager v{__version__}")
-            self.set_default_size(860, 560)
-            self.set_border_width(12)
+            self.set_default_size(900, 600)
+            self.set_position(Gtk.WindowPosition.CENTER)
+            self.set_icon_name("application-x-ms-dos-executable")
+            self.set_border_width(14)
 
             root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             self.add(root)
 
-            header = Gtk.Label()
+            header = Gtk.Label(xalign=0)
+            header.get_style_context().add_class("feather-title")
             header.set_markup(
-                f"<b>FeatherOS Compatibility Manager</b>  <small>v{__version__} — "
-                f"Backend: {controller.probe.recommended_graphics_backend.upper()}</small>"
+                f"<b><big>FeatherOS Compatibility Manager</big></b>  <small>v{__version__} — "
+                f"Graphics: {controller.probe.recommended_graphics_backend.upper()}</small>"
             )
-            header.set_xalign(0)
             root.pack_start(header, False, False, 0)
 
             notebook = Gtk.Notebook()
             root.pack_start(notebook, True, True, 0)
 
-            self.status_bar = Gtk.Label(label="Ready.")
-            self.status_bar.set_xalign(0)
+            self.status_bar = Gtk.Label(label="Ready.", xalign=0)
+            self.status_bar.get_style_context().add_class("feather-subtitle")
             root.pack_start(self.status_bar, False, False, 0)
 
-            # Tab 1: Bottles & Settings
-            tab_bottles = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+            # Tab 1: Bottles & Apps
+            tab_bottles = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=14)
             tab_bottles.set_border_width(10)
             notebook.append_page(tab_bottles, Gtk.Label(label="Bottles & Apps"))
 
-            left_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
-            left_col.set_size_request(220, -1)
+            left_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            left_col.set_size_request(230, -1)
             tab_bottles.pack_start(left_col, False, False, 0)
 
             self.bottle_list = Gtk.ListBox()
@@ -177,20 +198,25 @@ def _run_gtk_gui(controller: CompatController) -> int:
             self.new_entry = Gtk.Entry()
             self.new_entry.set_placeholder_text("New bottle name...")
             btn_add = Gtk.Button(label="Add")
+            btn_add.get_style_context().add_class("feather-primary")
             btn_add.connect("clicked", self._on_add_bottle)
             new_box.pack_start(self.new_entry, True, True, 0)
             new_box.pack_start(btn_add, False, False, 0)
             left_col.pack_start(new_box, False, False, 0)
 
-            right_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
-            tab_bottles.pack_start(right_col, True, True, 0)
+            right_scroll = Gtk.ScrolledWindow()
+            right_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            tab_bottles.pack_start(right_scroll, True, True, 0)
 
-            self.lbl_bottle_title = Gtk.Label()
-            self.lbl_bottle_title.set_xalign(0)
+            right_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            right_scroll.add(right_col)
+
+            self.lbl_bottle_title = Gtk.Label(xalign=0)
             right_col.pack_start(self.lbl_bottle_title, False, False, 0)
 
             btn_row = Gtk.Box(spacing=8)
             btn_run = Gtk.Button(label="Run / Install .exe or .msi...")
+            btn_run.get_style_context().add_class("feather-primary")
             btn_run.connect("clicked", self._on_pick_and_run)
             btn_sync = Gtk.Button(label="Sync Start Menu")
             btn_sync.connect("clicked", self._on_sync_shortcuts)
@@ -201,8 +227,12 @@ def _run_gtk_gui(controller: CompatController) -> int:
             btn_row.pack_end(btn_del, False, False, 0)
             right_col.pack_start(btn_row, False, False, 0)
 
+            settings_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+            settings_card.get_style_context().add_class("feather-card")
+            right_col.pack_start(settings_card, False, False, 0)
+
             grid = Gtk.Grid(column_spacing=12, row_spacing=8)
-            right_col.pack_start(grid, False, False, 0)
+            settings_card.pack_start(grid, False, False, 0)
 
             grid.attach(Gtk.Label(label="Windows Version:", xalign=0), 0, 0, 1, 1)
             self.cmb_winver = Gtk.ComboBoxText()
@@ -224,25 +254,34 @@ def _run_gtk_gui(controller: CompatController) -> int:
             self.ent_vdesktop.set_placeholder_text("Leave blank for native window")
             grid.attach(self.ent_vdesktop, 1, 5, 1, 1)
 
-            btn_save = Gtk.Button(label="Save Bottle Settings")
+            btn_save = Gtk.Button(label="Save & Apply to Prefix")
+            btn_save.get_style_context().add_class("feather-primary")
             btn_save.connect("clicked", self._on_save_settings)
             grid.attach(btn_save, 0, 6, 2, 1)
 
+            self.apps_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            right_col.pack_start(self.apps_box, False, False, 0)
+
             # Tab 2: Runtimes
+            rt_scroll = Gtk.ScrolledWindow()
+            rt_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
             tab_rt = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
             tab_rt.set_border_width(10)
-            notebook.append_page(tab_rt, Gtk.Label(label="Windows Runtimes"))
+            rt_scroll.add(tab_rt)
+            notebook.append_page(rt_scroll, Gtk.Label(label="Windows Runtimes"))
             for preset in RUNTIME_PRESETS:
                 row = Gtk.Box(spacing=10)
+                row.get_style_context().add_class("feather-card")
                 lbl = Gtk.Label(xalign=0)
                 lbl.set_markup(f"<b>{preset.label}</b>\n<small>{preset.description}</small>")
                 btn = Gtk.Button(label="Install")
+                btn.get_style_context().add_class("feather-primary")
                 btn.connect("clicked", self._on_install_runtime, preset.id)
                 row.pack_start(lbl, True, True, 0)
                 row.pack_end(btn, False, False, 0)
                 tab_rt.pack_start(row, False, False, 0)
 
-            # Tab 3: Performance & Gaming
+            # Tab 3: Performance & Diagnostics
             tab_sys = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             tab_sys.set_border_width(10)
             notebook.append_page(tab_sys, Gtk.Label(label="Performance & System"))
@@ -253,8 +292,11 @@ def _run_gtk_gui(controller: CompatController) -> int:
                 prof_box.pack_start(btn, False, False, 0)
             tab_sys.pack_start(prof_box, False, False, 0)
 
+            diag_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            diag_card.get_style_context().add_class("feather-card")
             self.lbl_diag = Gtk.Label(xalign=0)
-            tab_sys.pack_start(self.lbl_diag, False, False, 0)
+            diag_card.pack_start(self.lbl_diag, False, False, 0)
+            tab_sys.pack_start(diag_card, False, False, 0)
 
             self.selected_slug = "default"
             self._refresh_bottles()
@@ -268,8 +310,6 @@ def _run_gtk_gui(controller: CompatController) -> int:
                 row.slug = bottle.slug  # type: ignore[attr-defined]
                 lbl = Gtk.Label(label=f"{bottle.name} ({bottle.windows_version})", xalign=0)
                 lbl.set_margin_start(6)
-                lbl.set_margin_top(4)
-                lbl.set_margin_bottom(4)
                 row.add(lbl)
                 self.bottle_list.add(row)
             self.bottle_list.show_all()
@@ -292,6 +332,23 @@ def _run_gtk_gui(controller: CompatController) -> int:
             self.chk_mangohud.set_active(b.mangohud)
             self.ent_vdesktop.set_text(b.virtual_desktop or "")
 
+            for child in self.apps_box.get_children():
+                self.apps_box.remove(child)
+            if apps:
+                hdr = Gtk.Label(xalign=0)
+                hdr.set_markup("<b>Installed Windows Apps</b>")
+                self.apps_box.pack_start(hdr, False, False, 0)
+                for sc in apps:
+                    row = Gtk.Box(spacing=10)
+                    row.get_style_context().add_class("feather-card")
+                    lbl = Gtk.Label(label=sc.name, xalign=0)
+                    btn = Gtk.Button(label="Launch")
+                    btn.connect("clicked", self._on_launch_discovered, str(sc.target_path))
+                    row.pack_start(lbl, True, True, 0)
+                    row.pack_end(btn, False, False, 0)
+                    self.apps_box.pack_start(row, False, False, 0)
+            self.apps_box.show_all()
+
         def _refresh_diag(self) -> None:
             st = controller.get_system_status()
             s = st["system"]
@@ -302,6 +359,10 @@ def _run_gtk_gui(controller: CompatController) -> int:
                 f"<b>32-bit Multiarch:</b> {s['multiarch_i386']}\n"
                 f"<b>Installed Runners:</b> {', '.join(r['name'] for r in st['runners'])}"
             )
+
+        def _on_launch_discovered(self, _btn: Any, target: str) -> None:
+            _plan, _ok, msg = controller.launch_binary(target, self.selected_slug)
+            self.status_bar.set_text(msg)
 
         def _on_bottle_selected(self, _box: Any, row: Any) -> None:
             if row is not None and hasattr(row, "slug"):
@@ -333,7 +394,7 @@ def _run_gtk_gui(controller: CompatController) -> int:
                     virtual_desktop=vd,
                 )
                 self._refresh_bottles()
-                self.status_bar.set_text(f"Saved settings for '{self.selected_slug}'.")
+                self.status_bar.set_text(f"Saved & applied settings for '{self.selected_slug}'.")
             except Exception as exc:
                 self.status_bar.set_text(f"Error: {exc}")
 
@@ -364,6 +425,7 @@ def _run_gtk_gui(controller: CompatController) -> int:
 
         def _on_sync_shortcuts(self, _btn: Any) -> None:
             written = controller.sync_shortcuts(self.selected_slug)
+            self._load_bottle(self.selected_slug)
             self.status_bar.set_text(f"Synced {len(written)} Start Menu shortcuts.")
 
         def _on_delete_bottle(self, _btn: Any) -> None:
@@ -395,8 +457,8 @@ def _run_tk_gui(controller: CompatController) -> int:
     import tkinter as tk
     from tkinter import filedialog, ttk
 
-    bg = "#0f172a"
-    panel = "#1e293b"
+    bg = "#141821"
+    panel = "#1c2230"
     fg = "#f8fafc"
     muted = "#94a3b8"
     accent = "#38bdf8"
@@ -413,8 +475,8 @@ def _run_tk_gui(controller: CompatController) -> int:
     style.configure("TLabel", background=bg, foreground=fg, font=("Segoe UI", 10))
     style.configure("Muted.TLabel", background=bg, foreground=muted, font=("Segoe UI", 9))
     style.configure("Title.TLabel", background=bg, foreground=accent, font=("Segoe UI", 13, "bold"))
-    style.configure("TButton", background=panel, foreground=fg, padding=6, borderwidth=1)
-    style.map("TButton", background=[("active", "#334155"), ("pressed", "#0284c7")])
+    style.configure("TButton", background="#242c3d", foreground=fg, padding=6, borderwidth=1)
+    style.map("TButton", background=[("active", "#2e3950"), ("pressed", "#0284c7")])
     style.configure("TCheckbutton", background=bg, foreground=fg)
     style.map("TCheckbutton", background=[("active", bg)], foreground=[("active", accent)])
     style.configure("TCombobox", fieldbackground=panel, background=panel, foreground=fg)
@@ -429,7 +491,7 @@ def _run_tk_gui(controller: CompatController) -> int:
     style.configure("TNotebook.Tab", background=panel, foreground=muted, padding=(14, 7))
     style.map(
         "TNotebook.Tab",
-        background=[("selected", "#0284c7"), ("active", "#334155")],
+        background=[("selected", "#0284c7"), ("active", "#2e3950")],
         foreground=[("selected", "#ffffff"), ("active", "#f8fafc")],
     )
 
@@ -448,7 +510,6 @@ def _run_tk_gui(controller: CompatController) -> int:
     status_var = tk.StringVar(value="Ready.")
     ttk.Label(root, textvariable=status_var, style="Muted.TLabel", padding=(12, 6)).pack(fill="x")
 
-    # Tab 1: Bottles
     tab_bottles = ttk.Frame(notebook, padding=10)
     notebook.add(tab_bottles, text="Bottles & Apps")
 
@@ -559,7 +620,6 @@ def _run_tk_gui(controller: CompatController) -> int:
     tk.Entry(form, textvariable=vdesk_var, bg=panel, fg=fg, insertbackground=fg).grid(row=4, column=1, sticky="w", padx=8)
     ttk.Button(form, text="Save Bottle Settings", command=save_settings).grid(row=5, column=0, columnspan=2, sticky="w", pady=10)
 
-    # Tab 2: Runtimes
     tab_rt = ttk.Frame(notebook, padding=10)
     notebook.add(tab_rt, text="Windows Runtimes")
     for preset in RUNTIME_PRESETS:
@@ -574,7 +634,6 @@ def _run_tk_gui(controller: CompatController) -> int:
             ),
         ).pack(side="right")
 
-    # Tab 3: System & Performance
     tab_sys = ttk.Frame(notebook, padding=10)
     notebook.add(tab_sys, text="Performance & System")
     prof_var = tk.StringVar(value=f"Active profile: {get_active_profile(controller.config_dir).label}")

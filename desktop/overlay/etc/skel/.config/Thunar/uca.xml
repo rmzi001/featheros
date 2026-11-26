@@ -27,7 +27,7 @@
     <name>Inspect Windows Binary (.exe / .msi)</name>
     <submenu></submenu>
     <unique-id>1700000000003-3</unique-id>
-    <command>xfce4-terminal -e "sh -c 'feather-run inspect \"$1\"; echo; read -p \"Press Enter...\"'" sh %f</command>
+    <command>xfce4-terminal -x bash -c 'feather-run inspect "$1"; echo; read -r -p "Press Enter to close..." _' _ %f</command>
     <description>Show architecture, subsystem, and installer details for a Windows binary</description>
     <range></range>
     <patterns>*.exe;*.EXE;*.msi;*.MSI;*.dll;*.DLL</patterns>

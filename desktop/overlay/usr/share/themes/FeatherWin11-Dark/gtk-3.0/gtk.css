@@ -142,3 +142,12 @@ menu menuitem:hover {
     border-radius: 12px;
     color: #f8fafc;
 }
+
+/* Windows 11 subtle edge Show Desktop sliver */
+.xfce4-panel #showdesktop-button, .xfce4-panel button.showdesktop {
+    min-width: 10px;
+    padding: 0 3px;
+    border-left: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0;
+    margin: 6px 0 6px 4px;
+}

@@ -1,18 +1,20 @@
 # FeatherOS — Session State
 
-**Status:** v0.1.0 (Plume) Released & Empirically Boot-Verified
+**Status:** v0.2.0 (Plume Fluent) Released & Empirically Boot-Verified
 **SPEC Status:** FINALIZED
 **Last Updated:** 2026-11-26
 
-## Published Release
+## Published Release (`v0.2.0`)
 - **GitHub Repository:** https://github.com/rmzi001/featheros
-- **GitHub Release (`v0.1.0`):** https://github.com/rmzi001/featheros/releases/tag/v0.1.0
-- **Bootable ISO:** `featheros-0.1.0-amd64.iso` (1,444.26 MB / ~1.41 GiB, hybrid UEFI + Legacy BIOS + Rufus `/EFI/BOOT` tree)
-- **SHA256:** `22e1b5fcf79f43eb609f15cac709b259818da54f9fe93120bb1a48e7f7d27d19`
-- **CI Run #4 (100% green):** https://github.com/rmzi001/featheros/actions/runs/45781090020
+- **GitHub Release (`v0.2.0`):** https://github.com/rmzi001/featheros/releases/tag/v0.2.0
+- **Bootable ISO:** `featheros-0.2.0-amd64.iso` (1,595.74 MB / ~1.56 GiB, hybrid UEFI + Legacy BIOS + Rufus `/EFI/BOOT`)
+- **SHA256:** `a2987c565a98740227213beedde94d2bc06571b2c6c5ca1819e45e6097320157`
+- **CI Run #5 (100% green):** https://github.com/rmzi001/featheros/actions/runs/45821222621
 
-## Empirical Verification Captured
-- **Python unit, overlay & build pipeline tests:** 28/28 passed locally and on GitHub Actions (`ubuntu-latest`)
-- **Static build & LF validator (`scripts/validate-build.py`):** PASSED
-- **Live KVM QEMU boot-test:** Booted cleanly from BIOS GRUB -> Linux kernel -> systemd (`zramswap`, `NetworkManager`, `lightdm.service`) -> Openbox FeatherDark + Tint2 Windows-style taskbar + PCManFM wallpaper + Calamares Desktop icon + GTK3 Welcome App Hub (`feather-store`) in under 21 seconds.
-- **Visual proof:** Live QEMU desktop screenshot (`boot-desktop.png`, 71.5 KB) verified.
+## Major Upgrades Shipped in v0.2.0
+- Upgraded desktop from minimal Openbox/Tint2 to **Windows 11 Dark Glass on XFCE 4.20** (~350–420 MB idle RAM)
+- Centered frosted dark taskbar (`xfce4-panel`) + custom cyan 4-pane Start button (`featheros-start.svg`) + rounded Whisker Start Menu
+- Custom `FeatherWin11-Dark` GTK3 theme + `Arc-Dark` window borders + `Papirus-Dark` icons + Dark Bloom SVG wallpaper
+- New Windows-style unified **System Settings Hub** (`feather-settings`) covering System, Network, Bluetooth & Devices, Personalization, Sound, Windows Apps, and Updates
+- Complete built-in app suite: tabbed Thunar File Explorer (`Windows Drive (C:)` sidebar + `.exe`/`.msi` right-click actions), Firefox ESR, Live Task Manager (`Ctrl+Shift+Esc`), Snipping Tool (`Super+Shift+S`), Calculator, Media/PDF/Photo/Editor/Archive apps, Bluetooth, Volume, Power, Notification Center
+- Boot tuning: disabled slow live background timers (`apt-daily`, `man-db`, `fstrim`), eliminated `/etc/network` init warning, branded `/etc/issue` as `FeatherOS 0.2.0 (Plume Fluent)`

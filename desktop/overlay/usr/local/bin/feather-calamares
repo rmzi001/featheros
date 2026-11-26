@@ -1,0 +1,4 @@
+#!/bin/sh
+# Launch Calamares disk installer with X11 display environment preserved cleanly under pkexec
+set -eu
+exec pkexec env DISPLAY="${DISPLAY:-:0}" XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" calamares

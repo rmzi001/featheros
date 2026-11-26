@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=FeatherWin11-Light
+Comment=Windows 11 Light Glass (Fluent) theme for FeatherOS
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=FeatherWin11-Light
+MetacityTheme=FeatherWin11-Light
+IconTheme=Papirus-Light
+CursorTheme=Adwaita
+ButtonLayout=:minimize,maximize,close

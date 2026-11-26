@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "featheros"
-version = "0.2.0"
-description = "FeatherOS Windows compatibility layer, settings hub, app store, and system control suite"
+version = "0.3.0"
+description = "FeatherOS Windows compatibility layer, settings hub, app store, QA agent, and system control suite"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MIT"}
@@ -21,6 +21,7 @@ feather-compat = "featheros.compat_gui:main"
 feather-ctl = "featheros.ctl:main"
 feather-store = "featheros.store:main"
 feather-settings = "featheros.settings_hub:main"
+feather-selftest = "featheros.selftest:main"
 
 [tool.setuptools.packages.find]
 where = ["compat"]

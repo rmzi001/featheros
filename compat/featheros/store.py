@@ -1,9 +1,4 @@
-"""feather-store: FeatherOS Welcome, Browser & Gaming App Hub.
-
-Provides a lightweight curated catalog for one-click installation of web browsers,
-PC gaming launchers (Steam/Heroic/Lutris/GE-Proton), productivity apps, and
-developer tools, plus quick access to FeatherRun and the Calamares disk installer.
-"""
+"""feather-store: FeatherOS Welcome, Browser & Gaming App Hub (v0.3.0)."""
 
 from __future__ import annotations
 
@@ -11,15 +6,17 @@ import argparse
 from dataclasses import asdict, dataclass
 import json
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
+import threading
 from typing import Any, Callable, Sequence
 
-from . import __version__
-from .ctl import collect_system_status
+from . import __codename__, __version__
+from .ctl import collect_system_status, get_config_dir
 from .fluent_theme import apply_fluent_gtk_theme
-from .runners import list_installed_runners
+from .runners import install_ge_proton, list_installed_runners
 from .system_probe import SystemProbe, probe_system
 
 
@@ -31,7 +28,7 @@ class StoreApp:
     name: str
     category: str  # "browsers", "gaming", "productivity", "developer"
     summary: str
-    install_kind: str  # "apt", "ge-proton", "script"
+    install_kind: str  # "apt", "ge-proton"
     packages: tuple[str, ...]
     check_binaries: tuple[str, ...]
     size_hint: str
@@ -180,6 +177,24 @@ class InstallPlan:
         }
 
 
+def get_welcome_autostart(config_dir: str | Path | None = None) -> bool:
+    cfg = get_config_dir(config_dir) / "welcome.json"
+    if cfg.is_file():
+        try:
+            return bool(json.loads(cfg.read_text(encoding="utf-8")).get("show_on_startup", True))
+        except (OSError, ValueError):
+            pass
+    return True
+
+
+def set_welcome_autostart(enabled: bool, config_dir: str | Path | None = None) -> None:
+    base = get_config_dir(config_dir)
+    base.mkdir(parents=True, exist_ok=True)
+    (base / "welcome.json").write_text(
+        json.dumps({"show_on_startup": bool(enabled)}, indent=2) + "\n", encoding="utf-8"
+    )
+
+
 class StoreController:
     """Headless FeatherStore catalog, status detector, and install planner."""
 
@@ -221,35 +236,45 @@ class StoreController:
         return any(self.which(binary) is not None for binary in app.check_binaries)
 
     def has_calamares_installer(self) -> bool:
-        return self.which("calamares") is not None
+        return self.which("calamares") is not None or self.which("feather-calamares") is not None
 
     def build_install_plan(self, app_id: str) -> InstallPlan:
         app = self.get_app(app_id)
         installed = self.is_installed(app)
 
         if app.install_kind == "ge-proton":
-            cmd = ["feather-ctl", "runners"]
             return InstallPlan(
                 app=app,
                 installed=installed,
-                command=cmd,
+                command=["python3", "-m", "featheros.store", "install", "ge-proton"],
                 can_execute_locally=True,
-                note="Downloads latest GE-Proton release tarball into FEATHEROS_HOME/runners.",
+                note="Downloads latest GE-Proton tarball from GitHub Releases into FEATHEROS_HOME/runners.",
             )
 
         apt_get = self.which("apt-get")
         pkexec = self.which("pkexec")
         sudo = self.which("sudo")
-        prefix: list[str] = []
-        if pkexec:
-            prefix = [pkexec]
-        elif sudo:
-            prefix = [sudo]
+        term = self.which("xfce4-terminal")
+        pkgs_str = " ".join(shlex.quote(p) for p in app.packages)
 
-        cmd = prefix + ["apt-get", "install", "-y", "--no-install-recommends", *app.packages]
+        # Always run `apt-get update` first so fresh Live ISO boots with cleaned apt lists succeed!
+        inner_bash = (
+            f"apt-get update && apt-get install -y --no-install-recommends {pkgs_str}"
+        )
+        elevate = [pkexec] if pkexec else ([sudo] if sudo else [])
+        if term:
+            elev_prefix = " ".join(shlex.quote(x) for x in elevate)
+            shell_cmd = (
+                f"{elev_prefix + ' ' if elev_prefix else ''}bash -c {shlex.quote(inner_bash)}; "
+                f"echo; read -r -p 'Press Enter to close...' _"
+            )
+            cmd = [term, "-x", "bash", "-c", shell_cmd]
+        else:
+            cmd = elevate + ["bash", "-c", inner_bash]
+
         can_run = apt_get is not None
         note = (
-            f"Will install Debian packages: {', '.join(app.packages)}"
+            f"Updates apt cache and installs: {', '.join(app.packages)}"
             if can_run
             else "apt-get is not available on this host (preview mode; runs natively inside FeatherOS)."
         )
@@ -265,12 +290,16 @@ class StoreController:
         plan = self.build_install_plan(app_id)
         if dry_run:
             return plan, True, f"[dry-run] {' '.join(plan.command)}"
+        if plan.app.install_kind == "ge-proton":
+            try:
+                asset = install_ge_proton(home=self.home)
+                return plan, True, f"Installed {asset.tag} into FeatherOS runners!"
+            except Exception as exc:
+                return plan, False, f"GE-Proton install failed: {exc}"
         if not plan.can_execute_locally:
             return plan, False, plan.note
-        if plan.app.install_kind == "ge-proton":
-            return plan, False, "Use GitHub GE-Proton downloader on a live FeatherOS session."
         subprocess.Popen(plan.command)
-        return plan, True, f"Started installer for {plan.app.name}."
+        return plan, True, f"Opened installer terminal for {plan.app.name}."
 
     def welcome_summary(self) -> dict[str, Any]:
         status = collect_system_status(
@@ -285,23 +314,25 @@ def _run_gtk_store(controller: StoreController) -> int:
     import gi  # type: ignore[import-not-found]
 
     gi.require_version("Gtk", "3.0")
-    from gi.repository import Gtk  # type: ignore[import-not-found]
+    from gi.repository import GLib, Gtk  # type: ignore[import-not-found]
 
     apply_fluent_gtk_theme()
 
     class FeatherStoreWindow(Gtk.Window):
         def __init__(self) -> None:
             super().__init__(title=f"Welcome to FeatherOS v{__version__} — App Hub")
-            self.set_default_size(840, 540)
-            self.set_border_width(14)
+            self.set_default_size(860, 560)
+            self.set_position(Gtk.WindowPosition.CENTER)
+            self.set_icon_name("system-software-install")
+            self.set_border_width(16)
 
-            root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+            root = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
             self.add(root)
 
             title = Gtk.Label(xalign=0)
             title.get_style_context().add_class("feather-title")
             title.set_markup(
-                f"<b><big>Welcome to FeatherOS</big></b>  <small>v{__version__} (Plume Fluent)</small>\n"
+                f"<b><big>Welcome to FeatherOS</big></b>  <small>v{__version__} ({__codename__})</small>\n"
                 "<small>Modern lightweight Windows-compatible OS with built-in .exe/.msi support.</small>"
             )
             root.pack_start(title, False, False, 0)
@@ -311,42 +342,82 @@ def _run_gtk_store(controller: StoreController) -> int:
             btn_compat.get_style_context().add_class("feather-primary")
             btn_compat.connect("clicked", lambda _b: subprocess.Popen(["feather-compat"]))
             quick.pack_start(btn_compat, False, False, 0)
+
             btn_settings = Gtk.Button(label="System Settings")
             btn_settings.connect("clicked", lambda _b: subprocess.Popen(["feather-settings"]))
             quick.pack_start(btn_settings, False, False, 0)
+
             if controller.has_calamares_installer():
+                cal_cmd = (
+                    ["feather-calamares"]
+                    if controller.which("feather-calamares")
+                    else ["pkexec", "calamares"]
+                )
                 btn_install = Gtk.Button(label="Install FeatherOS to Disk")
-                btn_install.connect("clicked", lambda _b: subprocess.Popen(["pkexec", "calamares"]))
+                btn_install.connect("clicked", lambda _b: subprocess.Popen(cal_cmd))
                 quick.pack_start(btn_install, False, False, 0)
             root.pack_start(quick, False, False, 0)
 
-            notebook = Gtk.Notebook()
-            root.pack_start(notebook, True, True, 0)
+            self.notebook = Gtk.Notebook()
+            root.pack_start(self.notebook, True, True, 0)
 
+            footer = Gtk.Box(spacing=12)
             self.status_lbl = Gtk.Label(label="Choose an app to install.", xalign=0)
             self.status_lbl.get_style_context().add_class("feather-subtitle")
-            root.pack_start(self.status_lbl, False, False, 0)
+            footer.pack_start(self.status_lbl, True, True, 0)
 
+            chk_startup = Gtk.CheckButton(label="Show on startup")
+            chk_startup.set_active(get_welcome_autostart(controller.config_dir))
+            chk_startup.connect(
+                "toggled",
+                lambda b: set_welcome_autostart(b.get_active(), controller.config_dir),
+            )
+            footer.pack_end(chk_startup, False, False, 0)
+            root.pack_start(footer, False, False, 0)
+
+            self._build_tabs()
+
+        def _build_tabs(self) -> None:
             for cat in VALID_CATEGORIES:
+                scroll = Gtk.ScrolledWindow()
+                scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
                 box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
                 box.set_border_width(10)
+                scroll.add(box)
                 for item in controller.list_apps(category=cat):
-                    row = Gtk.Box(spacing=10)
+                    row = Gtk.Box(spacing=12)
                     row.get_style_context().add_class("feather-card")
-                    badge = " [Installed]" if item["installed"] else f" ({item['size_hint']})"
                     lbl = Gtk.Label(xalign=0)
-                    lbl.set_markup(f"<b>{item['name']}</b><small>{badge}</small>\n<small>{item['summary']}</small>")
-                    btn = Gtk.Button(label="Installed" if item["installed"] else "Install")
-                    if not item["installed"]:
-                        btn.get_style_context().add_class("feather-primary")
-                    btn.set_sensitive(not item["installed"])
-                    btn.connect("clicked", self._on_install, item["id"])
+                    lbl.set_markup(
+                        f"<b>{item['name']}</b>  <small>({item['size_hint']})</small>\n"
+                        f"<small>{item['summary']}</small>"
+                    )
                     row.pack_start(lbl, True, True, 0)
-                    row.pack_end(btn, False, False, 0)
+                    if item["installed"]:
+                        badge = Gtk.Label(label="✓ Installed")
+                        badge.get_style_context().add_class("feather-badge-ok")
+                        row.pack_end(badge, False, False, 0)
+                    else:
+                        btn = Gtk.Button(label="Install")
+                        btn.get_style_context().add_class("feather-primary")
+                        btn.connect("clicked", self._on_install, item["id"])
+                        row.pack_end(btn, False, False, 0)
                     box.pack_start(row, False, False, 0)
-                notebook.append_page(box, Gtk.Label(label=cat.title()))
+                self.notebook.append_page(scroll, Gtk.Label(label=cat.title()))
 
-        def _on_install(self, _btn: Any, app_id: str) -> None:
+        def _on_install(self, btn: Any, app_id: str) -> None:
+            if app_id == "ge-proton":
+                btn.set_sensitive(False)
+                self.status_lbl.set_text("Downloading latest GE-Proton from GitHub...")
+
+                def worker() -> None:
+                    _plan, _ok, msg = controller.install_app(app_id)
+                    GLib.idle_add(self.status_lbl.set_text, msg)
+                    GLib.idle_add(btn.set_sensitive, True)
+
+                threading.Thread(target=worker, daemon=True).start()
+                return
+
             _plan, _ok, msg = controller.install_app(app_id)
             self.status_lbl.set_text(msg)
 
@@ -361,15 +432,15 @@ def _run_tk_store(controller: StoreController) -> int:
     import tkinter as tk
     from tkinter import ttk
 
-    bg = "#0f172a"
-    panel = "#1e293b"
+    bg = "#141821"
+    panel = "#1c2230"
     fg = "#f8fafc"
     muted = "#94a3b8"
     accent = "#38bdf8"
 
     root = tk.Tk()
     root.title(f"Welcome to FeatherOS v{__version__} — FeatherStore")
-    root.geometry("860x540")
+    root.geometry("860x560")
     root.configure(bg=bg)
 
     style = ttk.Style()
@@ -381,13 +452,13 @@ def _run_tk_store(controller: StoreController) -> int:
     style.configure("CardMuted.TLabel", background=panel, foreground=muted, font=("Segoe UI", 9))
     style.configure("Title.TLabel", background=bg, foreground=accent, font=("Segoe UI", 14, "bold"))
     style.configure("Muted.TLabel", background=bg, foreground=muted, font=("Segoe UI", 9))
-    style.configure("TButton", background=panel, foreground=fg, padding=6, borderwidth=1)
-    style.map("TButton", background=[("active", "#334155"), ("pressed", "#0284c7")])
+    style.configure("TButton", background="#242c3d", foreground=fg, padding=6, borderwidth=1)
+    style.map("TButton", background=[("active", "#2e3950"), ("pressed", "#0284c7")])
     style.configure("TNotebook", background=bg, borderwidth=0)
     style.configure("TNotebook.Tab", background=panel, foreground=muted, padding=(14, 7))
     style.map(
         "TNotebook.Tab",
-        background=[("selected", "#0284c7"), ("active", "#334155")],
+        background=[("selected", "#0284c7"), ("active", "#2e3950")],
         foreground=[("selected", "#ffffff"), ("active", "#f8fafc")],
     )
 
@@ -396,7 +467,7 @@ def _run_tk_store(controller: StoreController) -> int:
     ttk.Label(header, text="Welcome to FeatherOS — App Hub", style="Title.TLabel").pack(anchor="w")
     ttk.Label(
         header,
-        text=f"v{__version__} (Plume)  •  One-click Browsers, Gaming Launchers, Productivity & Dev Tools",
+        text=f"v{__version__} ({__codename__})  •  One-click Browsers, Gaming Launchers, Productivity & Dev Tools",
         style="Muted.TLabel",
     ).pack(anchor="w", pady=(2, 0))
 
@@ -414,12 +485,12 @@ def _run_tk_store(controller: StoreController) -> int:
             card.pack(fill="x", pady=5)
             left = ttk.Frame(card, style="Card.TFrame")
             left.pack(side="left", fill="x", expand=True)
-            badge = "Installed" if item["installed"] else item["size_hint"]
+            badge = "✓ Installed" if item["installed"] else item["size_hint"]
             ttk.Label(left, text=f"{item['name']}  ({badge})", style="Card.TLabel").pack(anchor="w")
             ttk.Label(left, text=item["summary"], style="CardMuted.TLabel").pack(anchor="w")
             btn = ttk.Button(
                 card,
-                text="Installed" if item["installed"] else "Install",
+                text="✓ Installed" if item["installed"] else "Install",
                 command=lambda aid=item["id"]: status_var.set(controller.install_app(aid)[2]),
             )
             if item["installed"]:

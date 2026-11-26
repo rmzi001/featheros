@@ -8,6 +8,7 @@
       <property name="&lt;Super&gt;r" type="string" value="feather-compat"/>
       <property name="&lt;Super&gt;t" type="string" value="xfce4-terminal"/>
       <property name="&lt;Super&gt;l" type="string" value="xflock4"/>
+      <property name="&lt;Super&gt;v" type="string" value="xfce4-popup-clipman"/>
       <property name="&lt;Primary&gt;&lt;Shift&gt;Escape" type="string" value="xfce4-taskmanager"/>
       <property name="&lt;Super&gt;&lt;Shift&gt;s" type="string" value="xfce4-screenshooter -r"/>
       <property name="Print" type="string" value="xfce4-screenshooter"/>
@@ -20,6 +21,7 @@
       <property name="&lt;Super&gt;r" type="string" value="feather-compat"/>
       <property name="&lt;Super&gt;t" type="string" value="xfce4-terminal"/>
       <property name="&lt;Super&gt;l" type="string" value="xflock4"/>
+      <property name="&lt;Super&gt;v" type="string" value="xfce4-popup-clipman"/>
       <property name="&lt;Primary&gt;&lt;Shift&gt;Escape" type="string" value="xfce4-taskmanager"/>
       <property name="&lt;Super&gt;&lt;Shift&gt;s" type="string" value="xfce4-screenshooter -r"/>
       <property name="Print" type="string" value="xfce4-screenshooter"/>

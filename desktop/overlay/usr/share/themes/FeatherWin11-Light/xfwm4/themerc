@@ -1,0 +1,20 @@
+# FeatherWin11-Light — Crisp Fluent Windows 11 XFWM4 Theme
+active_text_color=#0f172a
+inactive_text_color=#64748b
+active_border_color=#cbd5e1
+inactive_border_color=#dbe3ee
+button_offset=0
+button_spacing=0
+full_width_title=true
+maximized_offset=0
+shadow_delta_height=4
+shadow_delta_width=0
+shadow_delta_x=0
+shadow_delta_y=-4
+shadow_opacity=45
+show_app_icon=true
+title_horizontal_offset=8
+title_vertical_offset_active=0
+title_vertical_offset_inactive=0
+title_shadow_active=false
+title_shadow_inactive=false

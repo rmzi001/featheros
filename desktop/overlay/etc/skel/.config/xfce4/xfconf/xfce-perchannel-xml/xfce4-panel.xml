@@ -103,8 +103,8 @@
       <property name="digital-layout" type="uint" value="1"/>
       <property name="digital-time-format" type="string" value="%H:%M"/>
       <property name="digital-date-format" type="string" value="%b %d"/>
-      <property name="digital-time-font" type="string" value="Sans Bold 9"/>
-      <property name="digital-date-font" type="string" value="Sans 8"/>
+      <property name="digital-time-font" type="string" value="Inter Bold 9"/>
+      <property name="digital-date-font" type="string" value="Inter 8"/>
     </property>
     <property name="plugin-17" type="string" value="showdesktop"/>
   </property>

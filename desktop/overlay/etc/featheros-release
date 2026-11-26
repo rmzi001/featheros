@@ -1,8 +1,8 @@
-PRETTY_NAME="FeatherOS 0.2.0 (Plume Fluent)"
+PRETTY_NAME="FeatherOS 0.3.0 (Plume Wholesome)"
 NAME="FeatherOS"
-VERSION_ID="0.2.0"
-VERSION="0.2.0 (Plume Fluent)"
-VERSION_CODENAME=plume-fluent
+VERSION_ID="0.3.0"
+VERSION="0.3.0 (Plume Wholesome)"
+VERSION_CODENAME=plume-wholesome
 ID=featheros
 ID_LIKE=debian
 HOME_URL="https://github.com/rmzi001/featheros"

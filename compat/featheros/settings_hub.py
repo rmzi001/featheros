@@ -1,9 +1,4 @@
-"""feather-settings: Windows 11-style Unified System Settings Hub for FeatherOS.
-
-Provides one clean sidebar-driven Settings interface for Display, Sound, Wi-Fi,
-Bluetooth, Power, Personalization, Performance Profiles, Windows Compatibility,
-and System Updates without hunting through scattered Linux dialogs.
-"""
+"""feather-settings: Windows 11-style Unified System Settings Hub for FeatherOS (v0.3.0)."""
 
 from __future__ import annotations
 
@@ -17,7 +12,15 @@ import sys
 from typing import Any, Callable, Sequence
 
 from . import __codename__, __version__
-from .ctl import PROFILES, apply_profile, collect_system_status, get_active_profile
+from .bottles import get_featheros_home
+from .ctl import (
+    PROFILES,
+    apply_profile,
+    apply_theme_mode,
+    collect_system_status,
+    get_active_profile,
+    get_theme_mode,
+)
 from .fluent_theme import apply_fluent_gtk_theme
 from .system_probe import SystemProbe, probe_system
 
@@ -81,6 +84,14 @@ SETTINGS_ACTIONS: tuple[SettingsAction, ...] = (
         command=("xfce4-notifyd-config",),
         check_binary="xfce4-notifyd-config",
     ),
+    SettingsAction(
+        id="startup-apps",
+        section="system",
+        title="Startup Applications & Session",
+        description="Manage programs that start automatically when you sign in.",
+        command=("xfce4-session-settings",),
+        check_binary="xfce4-session-settings",
+    ),
     # Network
     SettingsAction(
         id="wifi",
@@ -120,7 +131,7 @@ SETTINGS_ACTIONS: tuple[SettingsAction, ...] = (
         id="appearance",
         section="personalization",
         title="Theme, Icons & Fonts",
-        description="Switch Fluent Dark/Light theme, Papirus icons, and UI fonts.",
+        description="Fine-tune Fluent Dark/Light theme, Papirus icons, and Inter fonts.",
         command=("xfce4-appearance-settings",),
         check_binary="xfce4-appearance-settings",
     ),
@@ -171,7 +182,7 @@ SETTINGS_ACTIONS: tuple[SettingsAction, ...] = (
         section="windows",
         title="Open Windows C: Drive",
         description="Browse Program Files and installed Windows apps in File Explorer.",
-        command=("thunar", str(Path.home() / "Windows-C")),
+        command=("thunar",),
         check_binary="thunar",
     ),
     SettingsAction(
@@ -192,14 +203,24 @@ SETTINGS_ACTIONS: tuple[SettingsAction, ...] = (
         check_binary="feather-store",
     ),
     SettingsAction(
+        id="default-apps",
+        section="updates",
+        title="Default Applications",
+        description="Choose default Browser, File Explorer, Media Player, and .exe handler.",
+        command=("xfce4-mime-settings",),
+        check_binary="xfce4-mime-settings",
+    ),
+    SettingsAction(
         id="system-update",
         section="updates",
         title="Check for System Updates",
         description="Refresh Debian security updates and Wine/Mesa packages.",
         command=(
             "xfce4-terminal",
-            "-e",
-            "sh -c 'sudo apt-get update && sudo apt-get upgrade; read -p \"Done. Press Enter...\"'",
+            "-x",
+            "bash",
+            "-c",
+            "sudo apt-get update && sudo apt-get upgrade; echo; read -r -p 'Done. Press Enter...' _",
         ),
         check_binary="apt-get",
     ),
@@ -208,7 +229,7 @@ SETTINGS_ACTIONS: tuple[SettingsAction, ...] = (
         section="updates",
         title="Install FeatherOS to Disk",
         description="Launch the Calamares graphical installer to install FeatherOS permanently.",
-        command=("pkexec", "calamares"),
+        command=("feather-calamares",),
         check_binary="calamares",
     ),
 )
@@ -233,10 +254,15 @@ class SettingsController:
     def list_sections(self) -> list[dict[str, str]]:
         return [{"id": sid, "label": label} for sid, label in SECTIONS]
 
-    def list_actions(self, section: str | None = None) -> list[dict[str, Any]]:
+    def list_actions(
+        self, section: str | None = None, *, query: str | None = None
+    ) -> list[dict[str, Any]]:
+        q = (query or "").strip().lower()
         results: list[dict[str, Any]] = []
         for action in SETTINGS_ACTIONS:
             if section and action.section != section:
+                continue
+            if q and q not in action.title.lower() and q not in action.description.lower():
                 continue
             item = action.to_dict()
             item["available"] = (
@@ -251,9 +277,21 @@ class SettingsController:
                 return action
         raise KeyError(f"Unknown settings action '{action_id}'")
 
+    def _resolve_command(self, action: SettingsAction) -> list[str]:
+        if action.id == "windows-c":
+            win_c = Path.home() / "Windows-C"
+            if not win_c.exists():
+                fallback = get_featheros_home(self.home) / "bottles" / "default" / "prefix" / "drive_c"
+                fallback.mkdir(parents=True, exist_ok=True)
+                return ["thunar", str(fallback)]
+            return ["thunar", str(win_c)]
+        if action.id == "install-disk" and not self.which("feather-calamares"):
+            return ["pkexec", "calamares"]
+        return list(action.command)
+
     def run_action(self, action_id: str, *, dry_run: bool = False) -> tuple[bool, str]:
         action = self.get_action(action_id)
-        cmd = list(action.command)
+        cmd = self._resolve_command(action)
         if dry_run:
             return True, f"[dry-run] {' '.join(cmd)}"
         if action.check_binary and self.which(action.check_binary) is None:
@@ -261,11 +299,22 @@ class SettingsController:
                 False,
                 f"'{action.check_binary}' is not installed on this host (preview mode; works natively in FeatherOS).",
             )
+        if action.id == "sync-apps":
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, check=False)
+            msg = proc.stdout.strip() or "Synced Windows Start Menu shortcuts."
+            notifier = self.which("notify-send")
+            if notifier:
+                subprocess.Popen([notifier, "-a", "FeatherOS Settings", "Start Menu Sync", msg])
+            return proc.returncode == 0, msg
+
         subprocess.Popen(cmd)
         return True, f"Opened {action.title}."
 
     def set_profile(self, profile_name: str, *, dry_run: bool = False) -> dict[str, Any]:
         return apply_profile(profile_name, config_dir=self.config_dir, dry_run=dry_run)
+
+    def set_theme_mode(self, mode: str, *, dry_run: bool = False) -> dict[str, Any]:
+        return apply_theme_mode(mode, config_dir=self.config_dir, dry_run=dry_run)
 
     def summary(self) -> dict[str, Any]:
         status = collect_system_status(
@@ -273,6 +322,13 @@ class SettingsController:
         )
         status["codename"] = __codename__
         status["sections"] = self.list_sections()
+        try:
+            usage = shutil.disk_usage(Path.home())
+            status["disk_free_gb"] = round(usage.free / (1024**3), 1)
+            status["disk_total_gb"] = round(usage.total / (1024**3), 1)
+        except OSError:
+            status["disk_free_gb"] = None
+            status["disk_total_gb"] = None
         return status
 
 
@@ -287,15 +343,16 @@ def _run_gtk_settings(controller: SettingsController) -> int:
     class FeatherSettingsWindow(Gtk.Window):
         def __init__(self) -> None:
             super().__init__(title=f"Settings — FeatherOS v{__version__}")
-            self.set_default_size(940, 600)
+            self.set_default_size(940, 620)
+            self.set_position(Gtk.WindowPosition.CENTER)
+            self.set_icon_name("preferences-system")
             self.set_border_width(14)
 
             outer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
             self.add(outer)
 
-            # Left Sidebar (Windows 11 Settings style)
             sidebar_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-            sidebar_box.set_size_request(230, -1)
+            sidebar_box.set_size_request(235, -1)
             outer.pack_start(sidebar_box, False, False, 0)
 
             brand = Gtk.Label(xalign=0)
@@ -303,6 +360,11 @@ def _run_gtk_settings(controller: SettingsController) -> int:
                 f"<b><big>Settings</big></b>\n<small>FeatherOS v{__version__} ({__codename__})</small>"
             )
             sidebar_box.pack_start(brand, False, False, 0)
+
+            self.search_entry = Gtk.SearchEntry()
+            self.search_entry.set_placeholder_text("Find a setting...")
+            self.search_entry.connect("search-changed", self._on_search_changed)
+            sidebar_box.pack_start(self.search_entry, False, False, 0)
 
             self.nav_list = Gtk.ListBox()
             self.nav_list.connect("row-selected", self._on_section_selected)
@@ -315,7 +377,6 @@ def _run_gtk_settings(controller: SettingsController) -> int:
                 self.nav_list.add(row)
             sidebar_box.pack_start(self.nav_list, True, True, 0)
 
-            # Right Detail Area
             right_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
             outer.pack_start(right_box, True, True, 0)
 
@@ -334,19 +395,49 @@ def _run_gtk_settings(controller: SettingsController) -> int:
             self.status_lbl.get_style_context().add_class("feather-subtitle")
             right_box.pack_start(self.status_lbl, False, False, 0)
 
+            self.current_section = "system"
             first_row = self.nav_list.get_row_at_index(0)
             if first_row is not None:
                 self.nav_list.select_row(first_row)
 
+        def _on_search_changed(self, _entry: Any) -> None:
+            q = self.search_entry.get_text().strip()
+            if q:
+                self._render_search(q)
+            else:
+                self._render_section(self.current_section)
+
         def _on_section_selected(self, _box: Any, row: Any) -> None:
             if row is None or not hasattr(row, "section_id"):
                 return
+            self.current_section = row.section_id
+            self.search_entry.set_text("")
             self._render_section(row.section_id)
 
-        def _render_section(self, section_id: str) -> None:
+        def _clear_cards(self) -> None:
             for child in self.cards_box.get_children():
                 self.cards_box.remove(child)
 
+        def _render_search(self, query: str) -> None:
+            self._clear_cards()
+            self.section_header.set_markup(f"<b><big>Search: {query}</big></b>")
+            for item in controller.list_actions(query=query):
+                self._add_action_card(item)
+            self.cards_box.show_all()
+
+        def _add_action_card(self, item: dict[str, Any]) -> None:
+            card = Gtk.Box(spacing=12)
+            card.get_style_context().add_class("feather-card")
+            txt = Gtk.Label(xalign=0)
+            txt.set_markup(f"<b>{item['title']}</b>\n<small>{item['description']}</small>")
+            btn = Gtk.Button(label="Open")
+            btn.connect("clicked", self._on_open_action, item["id"])
+            card.pack_start(txt, True, True, 0)
+            card.pack_end(btn, False, False, 0)
+            self.cards_box.pack_start(card, False, False, 0)
+
+        def _render_section(self, section_id: str) -> None:
+            self._clear_cards()
             sec_label = dict(SECTIONS).get(section_id, section_id.title())
             self.section_header.set_markup(f"<b><big>{sec_label}</big></b>")
 
@@ -359,13 +450,18 @@ def _run_gtk_settings(controller: SettingsController) -> int:
                     if sys_info["ram_total_mb"] is not None
                     else "Detected at runtime"
                 )
+                disk_text = (
+                    f"{st['disk_free_gb']} GB free / {st['disk_total_gb']} GB"
+                    if st.get("disk_free_gb") is not None
+                    else "Live RAM"
+                )
                 banner = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
                 banner.get_style_context().add_class("feather-card")
                 info_lbl = Gtk.Label(xalign=0)
                 info_lbl.set_markup(
-                    f"<b>FeatherOS {__version__} (Plume Fluent)</b>\n"
-                    f"<small>CPUs: {sys_info['cpu_count']}  •  Memory: {ram_text}  •  "
-                    f"Profile: {prof['label']}  •  Bottles: {st['bottles_count']}</small>"
+                    f"<b>About This PC — FeatherOS {__version__} ({__codename__})</b>\n"
+                    f"<small>CPUs: {sys_info['cpu_count']}  •  Memory: {ram_text}  •  Storage: {disk_text}\n"
+                    f"Active Profile: {prof['label']}  •  Graphics: {controller.probe.recommended_graphics_backend.upper()}  •  Bottles: {st['bottles_count']}</small>"
                 )
                 banner.pack_start(info_lbl, False, False, 0)
 
@@ -379,16 +475,28 @@ def _run_gtk_settings(controller: SettingsController) -> int:
                 banner.pack_start(p_row, False, False, 0)
                 self.cards_box.pack_start(banner, False, False, 0)
 
+            elif section_id == "personalization":
+                cur_theme = get_theme_mode(controller.config_dir)
+                t_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+                t_card.get_style_context().add_class("feather-card")
+                t_lbl = Gtk.Label(xalign=0)
+                t_lbl.set_markup(
+                    f"<b>Color Mode (Currently: {cur_theme.title()} Glass)</b>\n"
+                    "<small>Instantly switch taskbar, Start Menu, windows, icons, and wallpaper between Dark and Light Fluent Glass.</small>"
+                )
+                t_card.pack_start(t_lbl, False, False, 0)
+                t_row = Gtk.Box(spacing=8)
+                for m, label in (("dark", "Windows 11 Dark Glass"), ("light", "Windows 11 Light Glass")):
+                    btn = Gtk.Button(label=label)
+                    if m == cur_theme:
+                        btn.get_style_context().add_class("feather-primary")
+                    btn.connect("clicked", self._on_theme_mode, m)
+                    t_row.pack_start(btn, False, False, 0)
+                t_card.pack_start(t_row, False, False, 0)
+                self.cards_box.pack_start(t_card, False, False, 0)
+
             for item in controller.list_actions(section=section_id):
-                card = Gtk.Box(spacing=12)
-                card.get_style_context().add_class("feather-card")
-                txt = Gtk.Label(xalign=0)
-                txt.set_markup(f"<b>{item['title']}</b>\n<small>{item['description']}</small>")
-                btn = Gtk.Button(label="Open")
-                btn.connect("clicked", self._on_open_action, item["id"])
-                card.pack_start(txt, True, True, 0)
-                card.pack_end(btn, False, False, 0)
-                self.cards_box.pack_start(card, False, False, 0)
+                self._add_action_card(item)
 
             self.cards_box.show_all()
 
@@ -400,6 +508,12 @@ def _run_gtk_settings(controller: SettingsController) -> int:
             controller.set_profile(key)
             self._render_section("system")
             self.status_lbl.set_text(f"Active performance profile set to '{key}'.")
+
+        def _on_theme_mode(self, _btn: Any, mode: str) -> None:
+            controller.set_theme_mode(mode)
+            apply_fluent_gtk_theme(mode)
+            self._render_section("personalization")
+            self.status_lbl.set_text(f"Switched FeatherOS theme to {mode.title()} Glass.")
 
     win = FeatherSettingsWindow()
     win.connect("destroy", Gtk.main_quit)
@@ -421,7 +535,7 @@ def _run_tk_settings(controller: SettingsController) -> int:
 
     root = tk.Tk()
     root.title(f"Settings — FeatherOS v{__version__}")
-    root.geometry("920x580")
+    root.geometry("940x600")
     root.configure(bg=bg)
 
     style = ttk.Style()
@@ -436,18 +550,20 @@ def _run_tk_settings(controller: SettingsController) -> int:
     style.configure("CardTitle.TLabel", background=card_bg, foreground=fg, font=("Segoe UI", 10, "bold"))
     style.configure("CardMuted.TLabel", background=card_bg, foreground=muted, font=("Segoe UI", 9))
     style.configure("Muted.TLabel", background=bg, foreground=muted, font=("Segoe UI", 9))
-    style.configure("TButton", background="#242c3d", foreground=fg, padding=(12, 6), borderwidth=1)
+    style.configure("TButton", background="#242c3d", foreground=fg, padding=(12, 6), borderwidth=0)
     style.map("TButton", background=[("active", "#2e3950"), ("pressed", "#0284c7")])
+    style.configure("Primary.TButton", background="#0284c7", foreground="#ffffff", padding=(12, 6), borderwidth=0)
+    style.map("Primary.TButton", background=[("active", "#0ea5e9")])
 
     outer = ttk.Frame(root)
     outer.pack(fill="both", expand=True)
 
-    side = ttk.Frame(outer, style="Side.TFrame", padding=14, width=230)
+    side = ttk.Frame(outer, style="Side.TFrame", padding=14, width=235)
     side.pack(side="left", fill="y")
     side.pack_propagate(False)
 
     ttk.Label(side, text="Settings", style="SideTitle.TLabel").pack(anchor="w")
-    ttk.Label(side, text=f"FeatherOS v{__version__} (Plume Fluent)", style="SideMuted.TLabel").pack(anchor="w", pady=(0, 12))
+    ttk.Label(side, text=f"FeatherOS v{__version__} ({__codename__})", style="SideMuted.TLabel").pack(anchor="w", pady=(0, 12))
 
     nav = tk.Listbox(
         side,
@@ -494,10 +610,29 @@ def _run_tk_settings(controller: SettingsController) -> int:
                 ttk.Button(
                     prow,
                     text=p.label,
+                    style="Primary.TButton" if k == prof.name else "TButton",
                     command=lambda key=k: (
                         controller.set_profile(key),
                         status_var.set(f"Switched profile to {key}."),
                         render_section(0),
+                    ),
+                ).pack(side="left", padx=(0, 8))
+        elif sid == "personalization":
+            cur_mode = get_theme_mode(controller.config_dir)
+            top = ttk.Frame(cards_container, style="Card.TFrame", padding=12)
+            top.pack(fill="x", pady=(0, 8))
+            ttk.Label(top, text=f"Color Mode: {cur_mode.title()} Glass", style="CardTitle.TLabel").pack(anchor="w")
+            trow = ttk.Frame(top, style="Card.TFrame")
+            trow.pack(anchor="w", pady=(6, 0))
+            for m, m_lbl in (("dark", "Dark Glass"), ("light", "Light Glass")):
+                ttk.Button(
+                    trow,
+                    text=m_lbl,
+                    style="Primary.TButton" if m == cur_mode else "TButton",
+                    command=lambda mode=m: (
+                        controller.set_theme_mode(mode),
+                        status_var.set(f"Theme mode set to {mode}."),
+                        render_section(idx),
                     ),
                 ).pack(side="left", padx=(0, 8))
 

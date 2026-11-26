@@ -1,5 +1,5 @@
-# FeatherOS v0.2.0 Core Mandatory Packages (installed with --no-install-recommends)
-# Boot, Kernel & Live System
+# FeatherOS v0.3.0 Core Mandatory Packages (installed with --no-install-recommends)
+# Boot, Kernel, Disk Installer & Live System
 linux-image-amd64
 initramfs-tools
 live-boot
@@ -14,15 +14,31 @@ wget
 unzip
 zram-tools
 plymouth
+grub-common
+grub2-common
+grub-pc-bin
+grub-efi-amd64-bin
+efibootmgr
+os-prober
+dosfstools
+e2fsprogs
+ntfs-3g
+exfatprogs
 
-# Networking & Audio
+# Networking, Audio & Desktop Security
 network-manager
 network-manager-gnome
 pipewire
 pipewire-pulse
+pipewire-alsa
 wireplumber
+pavucontrol
+mate-polkit
+xdg-user-dirs
+xdg-desktop-portal-gtk
+libnotify-bin
 
-# FeatherShell v0.2 (Modern Windows 11 Dark Glass on XFCE 4.20)
+# FeatherShell v0.3 (Windows 11 Dark/Light Glass on XFCE 4.20)
 xorg
 xinit
 lightdm
@@ -37,32 +53,40 @@ xfce4-whiskermenu-plugin
 xfce4-pulseaudio-plugin
 xfce4-power-manager
 xfce4-notifyd
+xfce4-clipman
+xfce4-clipman-plugin
 thunar
 thunar-volman
 thunar-archive-plugin
 tumbler
 gvfs
+gvfs-fuse
 xfce4-terminal
 xfce4-taskmanager
 xfce4-screenshooter
 mousepad
 ristretto
-arc-theme
+galculator
+atril
+mpv
+xarchiver
 papirus-icon-theme
 adwaita-icon-theme
+fonts-inter
 fonts-dejavu-core
 fonts-liberation
+fonts-noto-color-emoji
 xdg-utils
 desktop-file-utils
 shared-mime-info
 librsvg2-common
 
-# FeatherRun, FeatherSettings & FeatherStore Runtime (Python + GTK3)
+# FeatherRun, FeatherSettings, FeatherStore & FeatherSelftest Runtime (Python + GTK3)
 python3
 python3-gi
 gir1.2-gtk-3.0
 
-# Windows Compatibility Stack (64-bit + 32-bit multiarch)
+# Windows Compatibility Stack (64-bit + 32-bit multiarch + 32-bit audio/Vulkan)
 wine
 wine64
 wine32:i386
@@ -75,3 +99,5 @@ libgl1-mesa-dri
 libgl1-mesa-dri:i386
 libvulkan1
 libvulkan1:i386
+libpulse0:i386
+libasound2-plugins:i386

@@ -187,10 +187,23 @@ def inspect_binary(path: str | Path) -> BinaryInfo:
             if arch == "unknown":
                 arch = "x64" if opt_magic == 0x20B else "x86"
 
-    # WoW64 (win64 prefix) can run both x64 and most x86 binaries cleanly,
-    # while pure 16-bit/legacy DOS or explicit win32 needs win32.
-    # Recommend win64 for x64 and modern x86 (WoW64), unless explicitly pure DOS.
-    recommended_winearch = "win64" if arch in ("x64", "x86") else "win64"
+    # Reject ARM/ARM64 Windows binaries cleanly on x86_64 Wine
+    if arch in ("arm64", "arm", "armnt"):
+        return BinaryInfo(
+            path=str(file_path),
+            file_type="pe",
+            arch=arch,
+            recommended_winearch="win64",
+            subsystem=subsystem,
+            is_dll=is_dll,
+            is_installer=False,
+            installer_kind=None,
+            valid=False,
+            error=f"Unsupported Windows architecture '{arch}' (FeatherOS runs x86 and x64 Windows binaries).",
+        )
+
+    # WoW64 (win64 prefix) runs both x64 and modern x86 Windows software cleanly
+    recommended_winearch = "win64"
 
     is_installer, installer_kind = _detect_installer_marker(head, file_path.name)
 

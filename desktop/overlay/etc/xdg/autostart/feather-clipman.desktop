@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FeatherOS Clipboard History
+Comment=Windows-style clipboard history (Win+V)
+Exec=xfce4-clipman
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+NoDisplay=true

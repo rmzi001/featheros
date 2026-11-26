@@ -1,10 +1,15 @@
 #!/bin/sh
-# FeatherOS v0.2.0 first-login session bootstrap (XFCE 4.20 + Windows 11 Dark Glass)
+# FeatherOS v0.3.0 first-login session bootstrap (XFCE 4.20 + Windows 11 Dark/Light Glass)
 set -eu
 
 STAMP="$HOME/.config/featheros/.firstboot-done"
 WALLPAPER="/usr/share/backgrounds/featheros/wallpaper.svg"
 mkdir -p "$HOME/.config/featheros" "$HOME/.config/gtk-3.0" "$HOME/Desktop" "$HOME/Downloads" "$HOME/Documents" "$HOME/Pictures"
+
+# Initialize XDG user directories so Thunar displays standard Papirus folder icons
+if command -v xdg-user-dirs-update >/dev/null 2>&1; then
+  xdg-user-dirs-update || true
+fi
 
 # Ensure default Windows compatibility bottle exists and expose ~/Windows-C shortcut + Thunar sidebar bookmark
 if command -v feather-run >/dev/null 2>&1; then
@@ -22,7 +27,7 @@ if command -v feather-run >/dev/null 2>&1; then
   feather-run sync >/dev/null 2>&1 || true
 fi
 
-# Dynamically apply FeatherOS Dark Bloom wallpaper to every active XFCE monitor connector
+# Dynamically apply FeatherOS wallpaper to every active XFCE monitor connector
 if command -v xfconf-query >/dev/null 2>&1 && [ -f "$WALLPAPER" ]; then
   sleep 1
   for prop in $(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep 'last-image$' || true); do
@@ -39,18 +44,28 @@ if command -v feather-ctl >/dev/null 2>&1; then
   feather-ctl profile "$PROFILE" >/dev/null 2>&1 || true
 fi
 
-# When running from the Live ISO, place Install FeatherOS shortcut on Desktop
+# When running from the Live ISO, place trusted Install FeatherOS shortcut on Desktop
 if [ -d /run/live/medium ] && [ -f /usr/share/applications/feather-install.desktop ]; then
-  if [ ! -f "$HOME/Desktop/feather-install.desktop" ]; then
-    cp /usr/share/applications/feather-install.desktop "$HOME/Desktop/feather-install.desktop" || true
-    chmod +x "$HOME/Desktop/feather-install.desktop" || true
+  DEST="$HOME/Desktop/feather-install.desktop"
+  if [ ! -f "$DEST" ]; then
+    cp /usr/share/applications/feather-install.desktop "$DEST" || true
+    chmod +x "$DEST" || true
+  fi
+  if command -v gio >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1 && [ -f "$DEST" ]; then
+    SUM="$(sha256sum "$DEST" | awk '{print $1}')"
+    gio set -t string "$DEST" metadata::xfce-exe-checksum "$SUM" >/dev/null 2>&1 || true
   fi
 fi
 
-# Launch FeatherStore Welcome Hub once on first login
+# Launch FeatherStore Welcome Hub on startup when enabled (default: enabled)
+SHOW_WELCOME="true"
+WELCOME_CFG="$HOME/.config/featheros/welcome.json"
+if [ -f "$WELCOME_CFG" ]; then
+  SHOW_WELCOME="$(python3 -c 'import json,sys; print("true" if json.load(open(sys.argv[1])).get("show_on_startup", True) else "false")' "$WELCOME_CFG" 2>/dev/null || echo true)"
+fi
 if [ ! -f "$STAMP" ]; then
   date -u +"%Y-%m-%dT%H:%M:%SZ" > "$STAMP"
-  if command -v feather-store >/dev/null 2>&1; then
-    feather-store gui >/dev/null 2>&1 &
-  fi
+fi
+if [ "$SHOW_WELCOME" = "true" ] && command -v feather-store >/dev/null 2>&1; then
+  feather-store gui >/dev/null 2>&1 &
 fi

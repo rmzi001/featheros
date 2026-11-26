@@ -16,7 +16,7 @@ HTML_TEMPLATE = """<!doctype html>
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>FeatherOS v0.1.0 — Live Interactive VM Console</title>
+<title>FeatherOS v0.3.0 — Live Interactive VM Console</title>
 <style>
   * { box-sizing: border-box; }
   html, body {
@@ -58,7 +58,7 @@ HTML_TEMPLATE = """<!doctype html>
 <body>
 <header>
   <div class="brand">
-    <span>FeatherOS v0.1.0 — Live QEMU Console</span>
+    <span>FeatherOS v0.3.0 — Live QEMU Console</span>
     <span id="status" class="pill">Connecting to VM...</span>
   </div>
   <div class="controls">

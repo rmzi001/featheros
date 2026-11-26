@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
+import getpass
 import json
 import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 from typing import Any
 
 from .pe_inspector import BinaryInfo, inspect_binary
@@ -237,7 +239,8 @@ class BottleManager:
             / "Start Menu"
             / "Programs"
         ).mkdir(parents=True, exist_ok=True)
-        (pdir / "drive_c" / "users" / "feather" / "Desktop").mkdir(parents=True, exist_ok=True)
+        current_user = getpass.getuser() or "feather"
+        (pdir / "drive_c" / "users" / current_user / "Desktop").mkdir(parents=True, exist_ok=True)
 
         self.save_bottle(cfg)
         return cfg
@@ -342,22 +345,25 @@ class BottleManager:
         use_dxvk = False
         use_vkd3d = False
         if cfg.dxvk:
-            if sys_probe.vulkan_hardware_ready:
+            if sys_probe.vulkan_hardware_ready and sys_probe.dxvk_available:
                 use_dxvk = True
                 for dll in DXVK_DLLS:
                     overrides[dll] = "n,b"
             else:
                 for dll in DXVK_DLLS:
                     overrides[dll] = "b"
-                notices.append(
-                    "Vulkan hardware acceleration unavailable; falling back to WineD3D (VM-safe mode)."
-                )
+                if not sys_probe.vulkan_hardware_ready:
+                    notices.append(
+                        "Vulkan hardware acceleration unavailable; falling back to WineD3D (VM-safe mode)."
+                    )
+                else:
+                    notices.append("DXVK libraries not installed; using built-in WineD3D.")
         else:
             for dll in DXVK_DLLS:
                 overrides[dll] = "b"
 
         if cfg.vkd3d:
-            if sys_probe.vulkan_hardware_ready:
+            if sys_probe.vulkan_hardware_ready and sys_probe.vkd3d_available:
                 use_vkd3d = True
                 for dll in VKD3D_DLLS:
                     overrides[dll] = "n,b"
@@ -444,3 +450,66 @@ class BottleManager:
             "WINEARCH": cfg.arch,
         }
         return cmd, env
+
+    def build_apply_settings_commands(
+        self, slug: str, probe: SystemProbe | None = None
+    ) -> tuple[list[list[str]], dict[str, str]]:
+        """Build Wine commands that apply persisted windows_version, DPI, and DXVK into the prefix."""
+        cfg = self.get_bottle(slug)
+        sys_probe = probe or probe_system()
+        wine_bin, _ = self.resolve_runner_binary(cfg, sys_probe)
+        prefix = self.prefix_dir(cfg.slug)
+
+        commands: list[list[str]] = [
+            [wine_bin, "winecfg", "-v", cfg.windows_version],
+            [
+                wine_bin,
+                "reg",
+                "add",
+                r"HKCU\Control Panel\Desktop",
+                "/v",
+                "LogPixels",
+                "/t",
+                "REG_DWORD",
+                "/d",
+                str(cfg.dpi),
+                "/f",
+            ],
+        ]
+        if cfg.dxvk and sys_probe.vulkan_hardware_ready and sys_probe.dxvk_available:
+            dxvk_setup = shutil.which("dxvk-setup")
+            if dxvk_setup:
+                commands.append([dxvk_setup, "install", "--symlink"])
+
+        env = {
+            "WINEPREFIX": str(prefix),
+            "WINEARCH": cfg.arch,
+            "WINEDEBUG": "-all",
+        }
+        return commands, env
+
+    def apply_bottle_settings(
+        self, slug: str, probe: SystemProbe | None = None
+    ) -> list[tuple[list[str], int]]:
+        """Apply windows_version, DPI, and DXVK setup into the bottle's Wine prefix."""
+        sys_probe = probe or probe_system()
+        if not sys_probe.can_run_wine:
+            return []
+        commands, env = self.build_apply_settings_commands(slug, probe=sys_probe)
+        merged = os.environ.copy()
+        merged.update(env)
+        results: list[tuple[list[str], int]] = []
+        for cmd in commands:
+            try:
+                rc = subprocess.run(
+                    cmd,
+                    env=merged,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=60,
+                    check=False,
+                ).returncode
+            except (OSError, subprocess.SubprocessError):
+                rc = 127
+            results.append((cmd, rc))
+        return results

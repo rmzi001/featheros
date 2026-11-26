@@ -86,9 +86,9 @@ cp "${VMLINUZ}" "${ISO_STAGE}/live/vmlinuz"
 cp "${INITRD}" "${ISO_STAGE}/live/initrd"
 
 echo "[5/6] Compressing SquashFS (${SQUASHFS_COMP})..."
+# Keep /boot inside filesystem.squashfs so Calamares unpackfs installs a bootable kernel & initramfs!
 mksquashfs "${ROOTFS_DIR}" "${ISO_STAGE}/live/filesystem.squashfs" \
-  -comp "${SQUASHFS_COMP}" -Xcompression-level 15 \
-  -e boot
+  -comp "${SQUASHFS_COMP}" -Xcompression-level 15
 
 echo "[6/6] Generating hybrid UEFI + BIOS GRUB bootloaders and ISO..."
 cat > "${ISO_STAGE}/boot/grub/grub.cfg" <<EOF

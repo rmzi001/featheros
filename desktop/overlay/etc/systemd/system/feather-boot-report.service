@@ -1,0 +1,12 @@
+[Unit]
+Description=FeatherOS Live Boot QA Self-Test Reporter
+After=lightdm.service NetworkManager.service zramswap.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/feather-boot-report
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

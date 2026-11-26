@@ -1,0 +1,32 @@
+#!/bin/sh
+# Live boot QA reporter: runs feather-selftest (including Wine cmd.exe smoke) and logs to /dev/ttyS0
+set -u
+
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export WINEDEBUG="-all"
+TMP_HOME="/tmp/feather-selftest-home"
+TMP_PREFIX="/tmp/feather-selftest-wine"
+mkdir -p "$TMP_HOME"
+export HOME="$TMP_HOME"
+export WINEPREFIX="$TMP_PREFIX"
+
+# Allow LightDM, XFCE, NetworkManager, and zramswap to settle
+sleep 8
+
+REPORT_TXT="/var/log/featheros-selftest.log"
+
+if command -v feather-selftest >/dev/null 2>&1; then
+  feather-selftest > "$REPORT_TXT" 2>&1 || true
+  if [ -w /dev/ttyS0 ]; then
+    {
+      echo ""
+      echo "=== FEATHEROS_QA_REPORT_BEGIN ==="
+      cat "$REPORT_TXT"
+      echo "=== FEATHEROS_QA_REPORT_END ==="
+      echo ""
+    } > /dev/ttyS0 2>/dev/null || true
+  fi
+fi
+
+rm -rf "$TMP_HOME" "$TMP_PREFIX" 2>/dev/null || true
+exit 0

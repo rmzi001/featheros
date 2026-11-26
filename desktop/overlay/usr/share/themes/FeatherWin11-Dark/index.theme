@@ -6,7 +6,7 @@ Encoding=UTF-8
 
 [X-GNOME-Metatheme]
 GtkTheme=FeatherWin11-Dark
-MetacityTheme=Arc-Dark
+MetacityTheme=FeatherWin11-Dark
 IconTheme=Papirus-Dark
 CursorTheme=Adwaita
 ButtonLayout=:minimize,maximize,close

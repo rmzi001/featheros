@@ -1,19 +1,12 @@
-# FeatherOS v0.2.0 Optional Apps, Hardware Firmware & Gaming Extras
+# FeatherOS v0.3.0 Optional Apps, Hardware Firmware, Installer & Gaming Extras
 # Installed best-effort per package so ISO builds stay portable across Debian suites.
 firefox-esr
-galculator
-atril
-mpv
-xarchiver
-pavucontrol
 bluez
 blueman
 xfce4-power-manager-plugins
-xfce4-clipman-plugin
 gvfs-backends
 lxpolkit
 plymouth-themes
-fonts-inter
 dxvk
 winetricks
 gamemode
@@ -23,4 +16,10 @@ firmware-linux
 firmware-iwlwifi
 firmware-realtek
 firmware-amd-graphics
+firmware-atheros
+firmware-brcm80211
+intel-microcode
+amd64-microcode
 calamares
+qml-module-qtquick2
+qml-module-qtquick-window2

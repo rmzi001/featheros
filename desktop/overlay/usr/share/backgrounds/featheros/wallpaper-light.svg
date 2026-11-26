@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <linearGradient id="skyL" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e0f2fe"/>
+      <stop offset="50%" stop-color="#f0f7ff"/>
+      <stop offset="100%" stop-color="#dbeafe"/>
+    </linearGradient>
+    <linearGradient id="pL1" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.88"/>
+      <stop offset="55%" stop-color="#38bdf8" stop-opacity="0.82"/>
+      <stop offset="100%" stop-color="#bae6fd" stop-opacity="0.92"/>
+    </linearGradient>
+    <linearGradient id="pL2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.78"/>
+      <stop offset="100%" stop-color="#1d4ed8" stop-opacity="0.72"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#skyL)"/>
+  <g transform="translate(960 520)">
+    <path d="M-380 120 C-290 -160, -20 -310, 320 -250 C140 -60, -40 160, -380 120 Z" fill="url(#pL2)" opacity="0.82"/>
+    <path d="M-280 190 C-120 -60, 110 -220, 350 -130 C210 50, 30 220, -280 190 Z" fill="url(#pL1)" opacity="0.92"/>
+    <path d="M-260 175 C-90 -20, 95 -165, 315 -115" stroke="#ffffff" stroke-width="3" fill="none" opacity="0.65"/>
+  </g>
+</svg>

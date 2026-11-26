@@ -1,6 +1,10 @@
-"""Shared Windows 11 Dark Glass (Fluent) GTK3 stylesheet for FeatherOS apps."""
+"""Shared Windows 11 Dark & Light Glass (Fluent) GTK3 stylesheets for FeatherOS apps."""
 
 from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
 
 FLUENT_DARK_GTK_CSS = """
 window, .background {
@@ -75,9 +79,13 @@ list row:selected, listbox row:selected {
     font-size: 12px;
 }
 
-.feather-accent {
-    color: #38bdf8;
-    font-weight: 700;
+.feather-badge-ok {
+    background-color: rgba(16, 185, 129, 0.16);
+    color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.45);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-weight: 600;
 }
 
 button {
@@ -108,7 +116,7 @@ button.suggested-action:hover, button.feather-primary:hover {
 button:disabled {
     background-color: #1a202c;
     color: #64748b;
-    border-color: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.05);
 }
 
 entry, combobox button {
@@ -122,19 +130,134 @@ entry, combobox button {
 entry:focus {
     border-color: #38bdf8;
 }
+"""
 
-checkbutton {
-    color: #e2e8f0;
+FLUENT_LIGHT_GTK_CSS = """
+window, .background {
+    background-color: #f3f6fb;
+    color: #0f172a;
 }
 
-separator {
-    background-color: rgba(255, 255, 255, 0.08);
+headerbar, .titlebar {
+    background-color: #e8eef7;
+    color: #0f172a;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.10);
+}
+
+notebook > header {
+    background-color: #e8eef7;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.10);
+}
+
+notebook > header > tabs > tab {
+    background-color: transparent;
+    color: #475569;
+    padding: 8px 16px;
+    border: none;
+    border-bottom: 2px solid transparent;
+}
+
+notebook > header > tabs > tab:checked {
+    color: #0284c7;
+    border-bottom: 2px solid #0284c7;
+    background-color: rgba(2, 132, 199, 0.08);
+}
+
+notebook > stack {
+    background-color: #f3f6fb;
+}
+
+list, listbox {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.10);
+    border-radius: 10px;
+}
+
+list row:selected, listbox row:selected {
+    background-color: rgba(2, 132, 199, 0.14);
+    color: #0369a1;
+    border-left: 3px solid #0284c7;
+}
+
+.feather-card {
+    background-color: #ffffff;
+    border: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+
+.feather-title {
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 16px;
+}
+
+.feather-subtitle {
+    color: #475569;
+    font-size: 12px;
+}
+
+.feather-badge-ok {
+    background-color: rgba(16, 185, 129, 0.14);
+    color: #047857;
+    border: 1px solid rgba(4, 120, 87, 0.35);
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-weight: 600;
+}
+
+button {
+    background-image: none;
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    border-radius: 8px;
+    padding: 6px 14px;
+    box-shadow: none;
+}
+
+button:hover {
+    background-color: #e2e8f0;
+    border-color: #0284c7;
+}
+
+button.suggested-action, button.feather-primary {
+    background-color: #0284c7;
+    color: #ffffff;
+    border-color: #0284c7;
+}
+
+entry, combobox button {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    border-radius: 8px;
+    padding: 6px 10px;
 }
 """
 
 
-def apply_fluent_gtk_theme() -> bool:
-    """Apply FeatherOS Windows 11 Dark Glass CSS to the active GTK3 screen."""
+def read_theme_mode(config_dir: str | Path | None = None) -> str:
+    """Return persisted FeatherOS theme mode ('dark' or 'light')."""
+    if config_dir is not None:
+        base = Path(config_dir)
+    else:
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        base = (Path(xdg) / "featheros") if xdg else (Path.home() / ".config" / "featheros")
+    cfg = base / "theme.json"
+    if cfg.is_file():
+        try:
+            mode = str(json.loads(cfg.read_text(encoding="utf-8")).get("mode", "dark")).lower()
+            if mode in ("dark", "light"):
+                return mode
+        except (OSError, ValueError):
+            pass
+    return "dark"
+
+
+def apply_fluent_gtk_theme(mode: str | None = None) -> bool:
+    """Apply FeatherOS Windows 11 Dark or Light Glass CSS to the active GTK3 screen."""
     try:
         import gi  # type: ignore[import-not-found]
 
@@ -143,12 +266,14 @@ def apply_fluent_gtk_theme() -> bool:
     except (ImportError, ValueError):
         return False
 
+    resolved = mode if mode in ("dark", "light") else read_theme_mode()
     settings = Gtk.Settings.get_default()
     if settings is not None:
-        settings.set_property("gtk-application-prefer-dark-theme", True)
+        settings.set_property("gtk-application-prefer-dark-theme", resolved == "dark")
 
+    css = FLUENT_LIGHT_GTK_CSS if resolved == "light" else FLUENT_DARK_GTK_CSS
     provider = Gtk.CssProvider()
-    provider.load_from_data(FLUENT_DARK_GTK_CSS.encode("utf-8"))
+    provider.load_from_data(css.encode("utf-8"))
     screen = Gdk.Screen.get_default()
     if screen is not None:
         Gtk.StyleContext.add_provider_for_screen(

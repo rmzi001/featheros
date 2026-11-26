@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from typing import Sequence
@@ -160,6 +161,45 @@ def _cmd_sync(args: argparse.Namespace, manager: BottleManager) -> int:
     return 0
 
 
+def _is_gui_session() -> bool:
+    return bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")) and not sys.stdin.isatty()
+
+
+def _notify_desktop(title: str, body: str) -> None:
+    notifier = shutil.which("notify-send")
+    if notifier and (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
+        try:
+            subprocess.Popen(
+                [notifier, "-a", "FeatherRun", "-i", "application-x-ms-dos-executable", title, body],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError:
+            pass
+
+
+def _show_gui_error(title: str, body: str) -> None:
+    if not _is_gui_session():
+        return
+    try:
+        import gi  # type: ignore[import-not-found]
+
+        gi.require_version("Gtk", "3.0")
+        from gi.repository import Gtk  # type: ignore[import-not-found]
+
+        dlg = Gtk.MessageDialog(
+            message_type=Gtk.MessageType.ERROR,
+            buttons=Gtk.ButtonsType.OK,
+            text=title,
+        )
+        dlg.format_secondary_text(body)
+        dlg.set_position(Gtk.WindowPosition.CENTER)
+        dlg.run()
+        dlg.destroy()
+    except Exception:
+        _notify_desktop(title, body)
+
+
 def _cmd_run(args: argparse.Namespace, manager: BottleManager) -> int:
     probe = probe_system()
     plan = manager.build_launch_plan(
@@ -172,7 +212,9 @@ def _cmd_run(args: argparse.Namespace, manager: BottleManager) -> int:
     )
 
     if not plan.binary_info.valid:
-        print(f"Error: {plan.binary_info.error}", file=sys.stderr)
+        msg = f"Cannot launch {Path(args.target).name}: {plan.binary_info.error}"
+        print(f"Error: {msg}", file=sys.stderr)
+        _show_gui_error("FeatherRun — Unsupported File", msg)
         return 1
 
     if args.dry_run:
@@ -183,12 +225,21 @@ def _cmd_run(args: argparse.Namespace, manager: BottleManager) -> int:
         print(f"[FeatherRun] {note}", file=sys.stderr)
 
     if not probe.can_run_wine:
-        print(
-            "[FeatherRun] Wine is not installed on this host. "
-            "Use --dry-run to inspect the launch plan or boot FeatherOS.",
-            file=sys.stderr,
+        msg = (
+            "Wine is not installed on this host. "
+            "Use --dry-run to inspect the launch plan or boot FeatherOS."
         )
+        print(f"[FeatherRun] {msg}", file=sys.stderr)
+        _show_gui_error("FeatherRun — Wine Not Found", msg)
         return 127
+
+    is_first_run = not (plan.prefix_path / "system.reg").is_file()
+    if is_first_run:
+        _notify_desktop(
+            "Preparing Windows Environment",
+            f"Initializing bottle '{plan.bottle.name}' ({plan.bottle.windows_version}) for first run...",
+        )
+        manager.apply_bottle_settings(plan.bottle.slug, probe=probe)
 
     manager.touch_last_used(plan.bottle.slug)
     merged_env = os.environ.copy()

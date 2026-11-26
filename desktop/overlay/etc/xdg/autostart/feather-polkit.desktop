@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FeatherOS PolicyKit Authentication Agent
+Comment=Provides graphical administrator elevation dialogs in XFCE
+Exec=/usr/local/bin/feather-polkit-agent
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+NoDisplay=true

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Start an available Polkit GUI authentication agent for XFCE 4.20
+if [ -x /usr/lib/x86_64-linux-gnu/polkit-mate-authentication-agent-1 ]; then
+  exec /usr/lib/x86_64-linux-gnu/polkit-mate-authentication-agent-1
+elif [ -x /usr/lib/mate-polkit/polkit-mate-authentication-agent-1 ]; then
+  exec /usr/lib/mate-polkit/polkit-mate-authentication-agent-1
+elif [ -x /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1 ]; then
+  exec /usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1
+elif command -v lxpolkit >/dev/null 2>&1; then
+  exec lxpolkit
+fi

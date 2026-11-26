@@ -1,16 +1,16 @@
-# FeatherOS
+# FeatherOS v0.3.0 (`Plume Wholesome`)
 
-**FeatherOS** is a lightweight, bootable x86_64 operating system built on **Debian Minimal** (`amd64` + `i386` multiarch) with a familiar Windows-like desktop (**FeatherShell**) and seamless `.exe` / `.msi` compatibility (**FeatherRun**).
+**FeatherOS** is a lightweight, bootable x86_64 operating system built on **Debian Minimal** (`amd64` + `i386` multiarch) with a modern **Windows 11 Dark & Light Glass** desktop (**FeatherShell on XFCE 4.20**) and seamless `.exe` / `.msi` compatibility (**FeatherRun**).
 
 ## Highlights
 
-- **Ultra-lightweight (~250–400 MB idle RAM):** Debian Minimal + Openbox + Tint2 Windows-style taskbar + `jgmenu` searchable Start Menu + `zram` zstd compressed swap.
-- **Seamless Windows software (`feather-run`):** Double-click `.exe` and `.msi` files directly in File Explorer. Pure-Python PE/MSI inspection, isolated per-app Wine/Proton Bottles, automatic Start Menu `.lnk` shortcut sync, and automatic **Vulkan → WineD3D fallback** so apps work both on bare-metal GPUs and inside QEMU/VirtualBox VMs.
-- **Compatibility Manager GUI (`feather-compat`):** Manage bottles, switch Windows version (`win11`–`winxp`), toggle DXVK/VKD3D-Proton, GameMode, MangoHud, Virtual Desktops, install common runtimes (`vcrun2022`, `dotnet48`, `corefonts`, `d3dx9`), and switch system profiles.
-- **Welcome & Curated App Hub (`feather-store`):** One-click installation for Browsers (Firefox ESR, Chromium), Gaming (Steam + Proton, Lutris, GE-Proton, GameMode/MangoHud), Productivity (LibreOffice, VLC, GIMP), and Developer tools.
-- **Graphical Hard-Drive Installer (`Calamares`):** Included in the Live ISO so you can test FeatherOS live and install it permanently to any SSD/HDD with UEFI + BIOS GRUB support.
-- **Performance Profiles (`feather-ctl`):** Switch between **Balanced**, **Low-RAM Saver** (2–4 GB PCs), and **Gaming Performance**.
-- **Reproducible Hybrid UEFI + BIOS ISO:** Boots in QEMU, VirtualBox, or flashed onto a USB stick for real hardware.
+- **Modern Windows 11 Dark & Light Glass Desktop (`XFCE 4.20`):** Centered translucent taskbar, searchable Whisker Start Menu (`Win`), custom Fluent Dark & Light XFWM4 window borders, `Inter` system typography, `Win+E` File Explorer, `Win+I` Settings, `Win+V` Clipboard History, `Win+L` Lock Screen, `Win+Shift+S` Snipping Tool, and `Alt+Tab` live window previews.
+- **Lightweight Efficiency (~400–550 MB idle RAM):** Debian Minimal (`--no-install-recommends`) + `zram` zstd compressed swap + performance profiles (**Balanced**, **Low-RAM Saver**, **Gaming Performance**).
+- **Seamless Windows Software (`feather-run` & `feather-compat`):** Double-click `.exe` and `.msi` files directly in File Explorer. Pure-Python PE/MSI inspection (with ARM64 guard), isolated per-app Wine/Proton Bottles, real `winecfg`/DPI/DXVK configuration, automatic Start Menu `.lnk` sync under **Windows Apps**, 32-bit PipeWire audio (`libpulse0:i386` + `libasound2-plugins:i386`), and automatic **Vulkan → WineD3D fallback**.
+- **Unified Windows-Style Settings Hub (`feather-settings`):** Instant Dark/Light Glass theme switching, Display, Network, Bluetooth, Sound, Power, Performance Profiles, Windows Apps, Default Apps, Startup Apps, System Info, and Updates — all searchable from one window.
+- **FeatherStore Welcome & Curated App Hub (`feather-store`):** One-click install for Browsers (Firefox ESR, Chromium), Gaming (Steam + Proton, Lutris, live GE-Proton downloader, GameMode/MangoHud), Productivity (LibreOffice, VLC, GIMP), and Developer tools.
+- **Bootable Calamares Disk Installer:** UEFI + Legacy BIOS GRUB2 (`grub-pc-bin`, `grub-efi-amd64-bin`, `efibootmgr`), NTFS/exFAT support (`ntfs-3g`, `exfatprogs`), Polkit GUI elevation (`mate-polkit`), live-user cleanup (`removeuser`, `packages`, `shellprocess`), and QML slideshow.
+- **Built-in QA Checking Agent (`feather-selftest`):** Empirical 100-point in-OS health & Win32 execution verifier that runs automatically on every CI KVM boot.
 
 ---
 
@@ -18,18 +18,18 @@
 
 ```text
 featheros/
-├── config/featheros.conf        # OS identity, Debian suite, zram & ISO settings
-├── compat/featheros/            # FeatherRun CLI, PE inspector, Bottles, Shortcuts, GUI, System Control
-├── desktop/overlay/             # FeatherShell rootfs overlay (Openbox, Tint2, jgmenu, MIME, LightDM, Plymouth)
+├── config/featheros.conf        # OS identity (v0.3.0), Debian suite, zram & ISO settings
+├── compat/featheros/            # FeatherRun, Bottles, Runners, Shortcuts, Settings Hub, Store, Selftest
+├── desktop/overlay/             # FeatherShell v0.3 overlay (XFCE 4.20, Dark/Light Glass themes, Calamares, Polkit)
 ├── build/                       # Debian debootstrap + SquashFS + hybrid UEFI/BIOS ISO builder & Dockerfile
-├── scripts/                     # QEMU boot launchers (Windows & Linux), host check, build validator
-├── .github/workflows/           # Cloud CI test & bootable ISO builder
-└── tests/                       # Automated unit, overlay, and build pipeline tests
+├── scripts/                     # QEMU launchers, browser VNC console, host check, build validator
+├── .github/workflows/           # Cloud CI test, KVM QEMU ISO boot verification & Release publisher
+└── tests/                       # Automated unit, selftest, overlay, and build pipeline tests
 ```
 
 ---
 
-## Try FeatherRun & FeatherCompat Right Now (Windows or Linux)
+## Try FeatherRun, FeatherSettings & FeatherSelftest Locally
 
 Run the full test & build validation suite (Python 3.10+, zero external deps):
 
@@ -38,10 +38,11 @@ python -m unittest discover -s tests -t . -v
 python scripts\validate-build.py
 ```
 
-Preview the Compatibility Manager or FeatherStore Welcome App Hub right on Windows (uses the dark Tkinter preview automatically when GTK3 isn't present):
+Preview FeatherSettings, FeatherCompat, or FeatherStore on Windows (uses the dark Tkinter preview automatically when GTK3 isn't present):
 
 ```powershell
 $env:PYTHONPATH = "compat"
+python -m featheros.settings_hub
 python -m featheros.compat_gui
 python -m featheros.store
 ```
@@ -57,12 +58,11 @@ python -m featheros.ctl status
 
 ---
 
-## Building the Bootable ISO (`featheros-0.1.0-amd64.iso`)
+## Building the Bootable ISO (`featheros-0.3.0-amd64.iso`)
 
-### Option 1: Cloud Build via GitHub Actions (Recommended on Windows — zero local Linux setup)
-1. Push this repository to GitHub.
-2. Open **Actions → FeatherOS CI & ISO Builder → Run workflow**.
-3. Download the `featheros-live-iso` artifact (`featheros-0.1.0-amd64.iso` + `.sha256`).
+### Option 1: Cloud Build via GitHub Actions (Recommended on Windows)
+1. Push to GitHub or open **Actions → FeatherOS CI & ISO Builder → Run workflow**.
+2. Download the verified ISO, SHA256, live KVM screenshots, and `feather-selftest` report from **Releases**.
 
 ### Option 2: Local Build in WSL2 (Debian/Ubuntu) or Native Linux
 ```bash
@@ -81,15 +81,8 @@ docker run --rm --privileged -v "$(pwd):/workspace" featheros-builder
 
 ## Boot-Testing in QEMU
 
-On Windows, check host readiness or install QEMU via `winget`:
 ```powershell
-.\scripts\setup-windows-host.ps1
-.\scripts\setup-windows-host.ps1 -InstallQemu
-```
-
-Boot the ISO with 2 GB RAM (to test low-RAM responsiveness):
-```powershell
-.\scripts\run-qemu.ps1 -IsoPath .\dist\featheros-0.1.0-amd64.iso -RamMB 2048 -Cpus 2
+.\scripts\run-qemu.ps1 -IsoPath .\dist\featheros-0.3.0-amd64.iso -RamMB 2048 -Cpus 2
 ```
 
 Live credentials: user `feather`, password `feather` (auto-logs in with passwordless `sudo`).

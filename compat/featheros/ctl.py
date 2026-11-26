@@ -1,8 +1,4 @@
-"""feather-ctl: FeatherOS system diagnostics and performance profile manager.
-
-Supports switching between Balanced, Low-RAM (2-4 GB PCs), and Gaming profiles
-so users can trade visual polish for raw memory or frame latency on demand.
-"""
+"""feather-ctl: FeatherOS system diagnostics, theme mode, and performance profile manager."""
 
 from __future__ import annotations
 
@@ -17,13 +13,14 @@ from typing import Any, Callable, Sequence
 
 from . import __version__
 from .bottles import BottleManager
+from .fluent_theme import read_theme_mode
 from .runners import list_installed_runners
 from .system_probe import SystemProbe, probe_system
 
 
 @dataclass(frozen=True)
 class PerformanceProfile:
-    """Definition of a FeatherOS desktop/system tuning profile."""
+    """Definition of a FeatherOS XFCE 4.20 desktop/system tuning profile."""
 
     name: str
     label: str
@@ -41,7 +38,7 @@ PROFILES: dict[str, PerformanceProfile] = {
     "balanced": PerformanceProfile(
         name="balanced",
         label="Balanced",
-        description="Lightweight compositor on, smooth desktop visuals, ~300 MB RAM idle.",
+        description="XFCE compositing on, smooth Windows 11 glass visuals, ~380 MB RAM idle.",
         compositor_enabled=True,
         swappiness=60,
         cpu_governor="schedutil",
@@ -50,7 +47,7 @@ PROFILES: dict[str, PerformanceProfile] = {
     "low-ram": PerformanceProfile(
         name="low-ram",
         label="Low-RAM Saver",
-        description="Disables Picom compositor and prioritizes zram compression for 2-4 GB PCs.",
+        description="Disables XFCE compositor shadows & animations for 2-4 GB PCs.",
         compositor_enabled=False,
         swappiness=100,
         cpu_governor="powersave",
@@ -59,7 +56,7 @@ PROFILES: dict[str, PerformanceProfile] = {
     "gaming": PerformanceProfile(
         name="gaming",
         label="Gaming Performance",
-        description="Disables compositor for zero-latency fullscreen and requests performance CPU scaling.",
+        description="Disables desktop compositor for lowest input latency and GameMode defaults.",
         compositor_enabled=False,
         swappiness=30,
         cpu_governor="performance",
@@ -91,19 +88,11 @@ def get_active_profile(config_dir: str | Path | None = None) -> PerformanceProfi
 
 
 def build_profile_actions(profile: PerformanceProfile) -> list[list[str]]:
-    """Compute non-privileged desktop actions for XFCE 4.20 (with Openbox/picom fallback)."""
-    actions: list[list[str]] = []
-    if profile.compositor_enabled:
-        actions.append(
-            ["xfconf-query", "-c", "xfwm4", "-p", "/general/use_compositing", "-s", "true"]
-        )
-        actions.append(["picom", "--config", "/etc/xdg/featheros/picom.conf", "-b"])
-    else:
-        actions.append(
-            ["xfconf-query", "-c", "xfwm4", "-p", "/general/use_compositing", "-s", "false"]
-        )
-        actions.append(["pkill", "-x", "picom"])
-    return actions
+    """Compute XFCE 4.20 desktop actions needed to switch to a profile."""
+    val = "true" if profile.compositor_enabled else "false"
+    return [
+        ["xfconf-query", "-c", "xfwm4", "-p", "/general/use_compositing", "-s", val],
+    ]
 
 
 def apply_profile(
@@ -154,13 +143,122 @@ def apply_profile(
     }
 
 
+def get_theme_mode(config_dir: str | Path | None = None) -> str:
+    return read_theme_mode(config_dir=get_config_dir(config_dir))
+
+
+def build_theme_actions(mode: str) -> list[list[str]]:
+    """Build XFCE 4.20 commands to switch FeatherOS between Dark Glass and Light Glass."""
+    is_dark = mode == "dark"
+    gtk_theme = "FeatherWin11-Dark" if is_dark else "FeatherWin11-Light"
+    icon_theme = "Papirus-Dark" if is_dark else "Papirus-Light"
+    dark_bool = "true" if is_dark else "false"
+    wallpaper = (
+        "/usr/share/backgrounds/featheros/wallpaper.svg"
+        if is_dark
+        else "/usr/share/backgrounds/featheros/wallpaper-light.svg"
+    )
+    rgba = (
+        ["0.06", "0.08", "0.12", "0.88"] if is_dark else ["0.95", "0.97", "0.99", "0.90"]
+    )
+    return [
+        ["xfconf-query", "-c", "xsettings", "-p", "/Net/ThemeName", "-s", gtk_theme],
+        ["xfconf-query", "-c", "xsettings", "-p", "/Net/IconThemeName", "-s", icon_theme],
+        ["xfconf-query", "-c", "xfwm4", "-p", "/general/theme", "-s", gtk_theme],
+        ["xfconf-query", "-c", "xfce4-panel", "-p", "/panels/dark-mode", "-s", dark_bool],
+        [
+            "xfconf-query",
+            "-c",
+            "xfce4-panel",
+            "-p",
+            "/panels/panel-1/background-rgba",
+            "-n",
+            "-t", "double", "-s", rgba[0],
+            "-t", "double", "-s", rgba[1],
+            "-t", "double", "-s", rgba[2],
+            "-t", "double", "-s", rgba[3],
+        ],
+        [
+            "xfconf-query",
+            "-c",
+            "xfce4-desktop",
+            "-p",
+            "/backdrop/screen0/monitor0/workspace0/last-image",
+            "-s",
+            wallpaper,
+        ],
+        [
+            "xfconf-query",
+            "-c",
+            "xfce4-desktop",
+            "-p",
+            "/backdrop/screen0/monitorVirtual-1/workspace0/last-image",
+            "-s",
+            wallpaper,
+        ],
+        [
+            "xfconf-query",
+            "-c",
+            "xfce4-desktop",
+            "-p",
+            "/backdrop/screen0/monitorVGA-1/workspace0/last-image",
+            "-s",
+            wallpaper,
+        ],
+    ]
+
+
+def apply_theme_mode(
+    mode: str,
+    *,
+    config_dir: str | Path | None = None,
+    dry_run: bool = False,
+    runner: Callable[[list[str]], int] | None = None,
+) -> dict[str, Any]:
+    """Persist and apply Windows 11 Dark Glass or Light Glass theme across XFCE 4.20."""
+    norm = mode.strip().lower()
+    if norm not in ("dark", "light"):
+        raise ValueError(f"Unsupported theme mode '{mode}'. Valid: ('dark', 'light')")
+
+    actions = build_theme_actions(norm)
+    cfg_root = get_config_dir(config_dir)
+    cfg_file = cfg_root / "theme.json"
+
+    executed: list[dict[str, Any]] = []
+    if not dry_run:
+        cfg_root.mkdir(parents=True, exist_ok=True)
+        cfg_file.write_text(json.dumps({"mode": norm}, indent=2) + "\n", encoding="utf-8")
+        for cmd in actions:
+            if runner is not None:
+                rc = runner(cmd)
+            else:
+                try:
+                    rc = subprocess.run(
+                        cmd,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        check=False,
+                    ).returncode
+                except OSError:
+                    rc = 127
+            executed.append({"command": cmd, "returncode": rc})
+
+    return {
+        "mode": norm,
+        "config_file": str(cfg_file),
+        "dry_run": dry_run,
+        "actions": actions,
+        "executed": executed,
+    }
+
+
 def collect_system_status(
     *,
     home: str | Path | None = None,
     config_dir: str | Path | None = None,
     probe: SystemProbe | None = None,
 ) -> dict[str, Any]:
-    """Return a unified status payload for feather-ctl and feather-compat."""
+    """Return a unified status payload for feather-ctl, feather-settings, and feather-compat."""
     sys_probe = probe or probe_system()
     mgr = BottleManager(home=home)
     profile = get_active_profile(config_dir=config_dir)
@@ -168,6 +266,7 @@ def collect_system_status(
     return {
         "os": "FeatherOS",
         "version": __version__,
+        "theme_mode": get_theme_mode(config_dir=config_dir),
         "active_profile": profile.to_dict(),
         "bottles_count": len(mgr.list_bottles()),
         "runners": [r.to_dict() for r in runners],
@@ -178,7 +277,7 @@ def collect_system_status(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="feather-ctl",
-        description="FeatherOS system status, performance profiles, and runner control",
+        description="FeatherOS system status, theme mode, performance profiles, and runner control",
     )
     parser.add_argument("--home", help="Override FEATHEROS_HOME data directory")
     parser.add_argument("--config-dir", help="Override FeatherOS config directory")
@@ -186,13 +285,18 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub = parser.add_subparsers(dest="command")
 
-    p_status = sub.add_parser("status", help="Show FeatherOS hardware, profile, and Wine status")
+    p_status = sub.add_parser("status", help="Show FeatherOS hardware, profile, theme, and Wine status")
     p_status.add_argument("--json", action="store_true")
 
     p_prof = sub.add_parser("profile", help="Get or set active performance profile")
     p_prof.add_argument("name", nargs="?", choices=tuple(PROFILES.keys()))
     p_prof.add_argument("--dry-run", action="store_true")
     p_prof.add_argument("--json", action="store_true")
+
+    p_theme = sub.add_parser("theme", help="Get or switch Dark / Light Windows 11 Glass theme")
+    p_theme.add_argument("mode", nargs="?", choices=("dark", "light"))
+    p_theme.add_argument("--dry-run", action="store_true")
+    p_theme.add_argument("--json", action="store_true")
 
     p_run = sub.add_parser("runners", help="List installed Wine/GE-Proton runners")
     p_run.add_argument("--json", action="store_true")
@@ -213,6 +317,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             sys_info = status["system"]
             print(f"FeatherOS v{status['version']} — System Control")
             print(f"  Profile:      {prof['label']} ({prof['name']})")
+            print(f"  Theme Mode:   {status['theme_mode']}")
             print(f"  Bottles:      {status['bottles_count']}")
             print(f"  Runners:      {', '.join(r['name'] for r in status['runners'])}")
             print(f"  Platform:     {sys_info['platform_system']} ({sys_info['machine']})")
@@ -239,6 +344,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         else:
             mode = " (dry-run)" if args.dry_run else ""
             print(f"Switched profile to {res['profile']['label']}{mode}.")
+        return 0
+
+    if args.command == "theme":
+        if not args.mode:
+            cur = get_theme_mode(config_dir=args.config_dir)
+            if args.json:
+                print(json.dumps({"mode": cur}, indent=2))
+            else:
+                print(f"Active theme mode: {cur}")
+            return 0
+        res = apply_theme_mode(args.mode, config_dir=args.config_dir, dry_run=args.dry_run)
+        if args.json:
+            print(json.dumps(res, indent=2))
+        else:
+            suffix = " (dry-run)" if args.dry_run else ""
+            print(f"Switched FeatherOS theme to {res['mode']}{suffix}.")
         return 0
 
     if args.command == "runners":
