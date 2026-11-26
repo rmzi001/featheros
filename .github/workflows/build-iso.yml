@@ -159,11 +159,11 @@ jobs:
           echo "=== Tail of qemu-serial.log ==="
           tail -n 50 dist/qemu-serial.log || true
 
-          # Empirical check: verify screenshots exist and serial log captured Linux kernel boot
+          # Empirical check: verify screenshots exist and serial log captured systemd + LightDM/login boot
           test -s dist/boot-early.png
           test -s dist/boot-desktop.png
           test -s dist/qemu-serial.log
-          grep -q "Linux version" dist/qemu-serial.log
+          grep -Eq "featheros login:|lightdm\.service|Reached target" dist/qemu-serial.log
           echo "=== FeatherOS QEMU Boot-Test PASSED ==="
 
       - name: Upload QEMU boot-test proof (screenshots, serial log & checksum)
