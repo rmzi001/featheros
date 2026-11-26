@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FeatherStore — App & Gaming Hub
+Comment=One-click installer for Browsers, Steam, Proton, Productivity & Dev Tools
+Exec=feather-store
+Icon=system-software-install
+Terminal=false
+StartupNotify=true

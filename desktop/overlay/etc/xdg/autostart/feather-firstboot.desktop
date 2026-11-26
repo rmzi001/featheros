@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=FeatherOS First-Boot Setup
+Comment=Initialize default Windows compatibility bottle, ~/Windows-C, and live installer shortcut
+Exec=/usr/local/bin/feather-firstboot
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true
+NoDisplay=true

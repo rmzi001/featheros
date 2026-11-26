@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=X-GNOME-Metatheme
+Name=FeatherWin11-Dark
+Comment=Windows 11 Dark Glass (Fluent) theme for FeatherOS
+Encoding=UTF-8
+
+[X-GNOME-Metatheme]
+GtkTheme=FeatherWin11-Dark
+MetacityTheme=Arc-Dark
+IconTheme=Papirus-Dark
+CursorTheme=Adwaita
+ButtonLayout=:minimize,maximize,close

@@ -1,11 +1,12 @@
 #!/bin/sh
-# FeatherOS first-login session bootstrap
+# FeatherOS v0.2.0 first-login session bootstrap (XFCE 4.20 + Windows 11 Dark Glass)
 set -eu
 
 STAMP="$HOME/.config/featheros/.firstboot-done"
-mkdir -p "$HOME/.config/featheros"
+WALLPAPER="/usr/share/backgrounds/featheros/wallpaper.svg"
+mkdir -p "$HOME/.config/featheros" "$HOME/.config/gtk-3.0" "$HOME/Desktop" "$HOME/Downloads" "$HOME/Documents" "$HOME/Pictures"
 
-# Ensure default Windows compatibility bottle exists and expose ~/Windows-C shortcut
+# Ensure default Windows compatibility bottle exists and expose ~/Windows-C shortcut + Thunar sidebar bookmark
 if command -v feather-run >/dev/null 2>&1; then
   if [ ! -d "$HOME/.local/share/featheros/bottles/default" ]; then
     feather-run bottles create default --windows-version win10 >/dev/null 2>&1 || true
@@ -13,10 +14,26 @@ if command -v feather-run >/dev/null 2>&1; then
   if [ ! -e "$HOME/Windows-C" ]; then
     ln -s "$HOME/.local/share/featheros/bottles/default/prefix/drive_c" "$HOME/Windows-C" || true
   fi
+  BOOKMARKS="$HOME/.config/gtk-3.0/bookmarks"
+  touch "$BOOKMARKS"
+  if ! grep -q "Windows-C" "$BOOKMARKS" 2>/dev/null; then
+    printf 'file://%s/Windows-C Windows Drive (C:)\n' "$HOME" >> "$BOOKMARKS"
+  fi
   feather-run sync >/dev/null 2>&1 || true
 fi
 
-# Apply persisted or default performance profile (starts picom in Balanced mode)
+# Dynamically apply FeatherOS Dark Bloom wallpaper to every active XFCE monitor connector
+if command -v xfconf-query >/dev/null 2>&1 && [ -f "$WALLPAPER" ]; then
+  sleep 1
+  for prop in $(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep 'last-image$' || true); do
+    xfconf-query -c xfce4-desktop -p "$prop" -s "$WALLPAPER" >/dev/null 2>&1 || true
+  done
+  for prop in $(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep 'image-style$' || true); do
+    xfconf-query -c xfce4-desktop -p "$prop" -s 5 >/dev/null 2>&1 || true
+  done
+fi
+
+# Apply persisted or default performance profile
 if command -v feather-ctl >/dev/null 2>&1; then
   PROFILE="$(feather-ctl profile --json 2>/dev/null | python3 -c 'import json,sys; print(json.load(sys.stdin).get("name","balanced"))' 2>/dev/null || echo balanced)"
   feather-ctl profile "$PROFILE" >/dev/null 2>&1 || true
@@ -30,6 +47,7 @@ if [ -d /run/live/medium ] && [ -f /usr/share/applications/feather-install.deskt
   fi
 fi
 
+# Launch FeatherStore Welcome Hub once on first login
 if [ ! -f "$STAMP" ]; then
   date -u +"%Y-%m-%dT%H:%M:%SZ" > "$STAMP"
   if command -v feather-store >/dev/null 2>&1; then

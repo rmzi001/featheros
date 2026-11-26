@@ -40,6 +40,10 @@ REQUIRED_REPO_FILES = [
     "compat/featheros/ctl.py",
     "compat/featheros/compat_gui.py",
     "compat/featheros/store.py",
+    "compat/featheros/settings_hub.py",
+    "compat/featheros/fluent_theme.py",
+    "desktop/overlay/usr/share/themes/FeatherWin11-Dark/gtk-3.0/gtk.css",
+    "desktop/overlay/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml",
     "desktop/overlay/etc/calamares/settings.conf",
     "desktop/overlay/etc/calamares/modules/unpackfs.conf",
     "desktop/overlay/etc/calamares/modules/bootloader.conf",
@@ -86,7 +90,7 @@ def check_package_lists() -> list[str]:
             seen_local.add(line)
             seen_all.add(line)
     # Critical packages sanity check
-    for must_have in ("linux-image-amd64", "live-boot", "openbox", "wine", "wine32:i386", "zram-tools"):
+    for must_have in ("linux-image-amd64", "live-boot", "xfwm4", "xfce4-panel", "thunar", "wine", "wine32:i386", "zram-tools"):
         if must_have not in seen_all:
             errors.append(f"Critical package missing from package lists: {must_have}")
     return errors

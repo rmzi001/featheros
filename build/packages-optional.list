@@ -1,14 +1,19 @@
-# FeatherOS Optional Desktop Utilities, Hardware Firmware & Gaming Extras
+# FeatherOS v0.2.0 Optional Apps, Hardware Firmware & Gaming Extras
 # Installed best-effort per package so ISO builds stay portable across Debian suites.
-plymouth-themes
-lxpolkit
-volumeicon-alsa
-pavucontrol
-mousepad
-gpicview
+firefox-esr
+galculator
+atril
+mpv
 xarchiver
-lxtask
-scrot
+pavucontrol
+bluez
+blueman
+xfce4-power-manager-plugins
+xfce4-clipman-plugin
+gvfs-backends
+lxpolkit
+plymouth-themes
+fonts-inter
 dxvk
 winetricks
 gamemode
@@ -18,5 +23,4 @@ firmware-linux
 firmware-iwlwifi
 firmware-realtek
 firmware-amd-graphics
-firefox-esr
 calamares

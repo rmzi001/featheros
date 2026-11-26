@@ -1,4 +1,4 @@
-# FeatherOS Core Mandatory Packages (installed with --no-install-recommends)
+# FeatherOS v0.2.0 Core Mandatory Packages (installed with --no-install-recommends)
 # Boot, Kernel & Live System
 linux-image-amd64
 initramfs-tools
@@ -22,19 +22,34 @@ pipewire
 pipewire-pulse
 wireplumber
 
-# FeatherShell X11 Minimal Desktop
+# FeatherShell v0.2 (Modern Windows 11 Dark Glass on XFCE 4.20)
 xorg
 xinit
 lightdm
 lightdm-gtk-greeter
-openbox
-picom
-tint2
-jgmenu
-pcmanfm
-lxterminal
-feh
+xfwm4
+xfdesktop4
+xfce4-panel
+xfce4-session
+xfce4-settings
+xfconf
+xfce4-whiskermenu-plugin
+xfce4-pulseaudio-plugin
+xfce4-power-manager
+xfce4-notifyd
+thunar
+thunar-volman
+thunar-archive-plugin
+tumbler
+gvfs
+xfce4-terminal
+xfce4-taskmanager
+xfce4-screenshooter
+mousepad
+ristretto
+arc-theme
 papirus-icon-theme
+adwaita-icon-theme
 fonts-dejavu-core
 fonts-liberation
 xdg-utils
@@ -42,7 +57,7 @@ desktop-file-utils
 shared-mime-info
 librsvg2-common
 
-# FeatherRun & FeatherCompat Runtime (Python + GTK3)
+# FeatherRun, FeatherSettings & FeatherStore Runtime (Python + GTK3)
 python3
 python3-gi
 gir1.2-gtk-3.0

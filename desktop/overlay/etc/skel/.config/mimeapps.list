@@ -4,10 +4,17 @@ application/x-dosexec=feather-run.desktop
 application/vnd.microsoft.portable-executable=feather-run.desktop
 application/x-msi=feather-run.desktop
 application/x-msdownload=feather-run.desktop
-inode/directory=pcmanfm.desktop
+inode/directory=thunar.desktop
+x-scheme-handler/http=firefox-esr.desktop
+x-scheme-handler/https=firefox-esr.desktop
+text/plain=org.xfce.mousepad.desktop
+image/png=org.xfce.ristretto.desktop
+image/jpeg=org.xfce.ristretto.desktop
+application/pdf=atril.desktop
 
 [Added Associations]
 application/x-ms-dos-executable=feather-run.desktop;
 application/x-dosexec=feather-run.desktop;
 application/vnd.microsoft.portable-executable=feather-run.desktop;
 application/x-msi=feather-run.desktop;
+inode/directory=thunar.desktop;

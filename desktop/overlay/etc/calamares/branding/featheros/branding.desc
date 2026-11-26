@@ -10,14 +10,14 @@ windowPlacement: center
 strings:
   productName: FeatherOS
   shortProductName: FeatherOS
-  version: 0.1.0
-  shortVersion: 0.1
-  versionedName: FeatherOS 0.1.0 (Plume)
-  shortVersionedName: FeatherOS 0.1
+  version: 0.2.0
+  shortVersion: 0.2
+  versionedName: FeatherOS 0.2.0 (Plume Fluent)
+  shortVersionedName: FeatherOS 0.2
   bootloaderEntryName: FeatherOS
-  productUrl: https://featheros.local
-  supportUrl: https://featheros.local
-  releaseNotesUrl: https://featheros.local
+  productUrl: https://github.com/rmzi001/featheros
+  supportUrl: https://github.com/rmzi001/featheros
+  releaseNotesUrl: https://github.com/rmzi001/featheros/releases
 
 images:
   productLogo: "/usr/share/backgrounds/featheros/wallpaper.svg"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FeatherOS chroot provisioning script (runs inside target Debian rootfs)
+# FeatherOS v0.2.0 chroot provisioning script (runs inside target Debian rootfs)
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
@@ -11,6 +11,7 @@ source "${BUILD_TMP}/featheros.conf"
 
 echo "[FeatherOS chroot] Configuring hostname and apt repositories (${DEBIAN_SUITE})..."
 echo "${LIVE_HOSTNAME}" > /etc/hostname
+mkdir -p /etc/network
 
 cat > /etc/apt/sources.list <<EOF
 deb ${DEBIAN_MIRROR} ${DEBIAN_SUITE} main contrib non-free non-free-firmware
@@ -28,11 +29,11 @@ read_pkg_list() {
   grep -Ev '^\s*(#|$)' "$1"
 }
 
-echo "[FeatherOS chroot] Installing core packages (--no-install-recommends)..."
+echo "[FeatherOS chroot] Installing core XFCE 4.20 + Wine packages (--no-install-recommends)..."
 mapfile -t CORE_PKGS < <(read_pkg_list "${BUILD_TMP}/packages-core.list")
 apt-get install -y --no-install-recommends "${CORE_PKGS[@]}"
 
-echo "[FeatherOS chroot] Installing optional firmware and gaming extras..."
+echo "[FeatherOS chroot] Installing optional apps, Bluetooth/audio tools, firmware & gaming extras..."
 mapfile -t OPT_PKGS < <(read_pkg_list "${BUILD_TMP}/packages-optional.list")
 for pkg in "${OPT_PKGS[@]}"; do
   if apt-cache show "${pkg}" >/dev/null 2>&1; then
@@ -43,12 +44,12 @@ for pkg in "${OPT_PKGS[@]}"; do
   fi
 done
 
-echo "[FeatherOS chroot] Applying FeatherShell desktop overlay..."
+echo "[FeatherOS chroot] Applying FeatherShell v0.2 Windows 11 Dark Glass overlay..."
 cp -a "${BUILD_TMP}/overlay/." /
 cp -f /etc/featheros-release /etc/os-release
 chmod +x /usr/local/bin/feather-firstboot /etc/xdg/openbox/autostart
 
-echo "[FeatherOS chroot] Installing FeatherRun / FeatherCompat / FeatherCtl..."
+echo "[FeatherOS chroot] Installing FeatherRun / FeatherCompat / FeatherSettings / FeatherStore / FeatherCtl..."
 rm -rf /usr/lib/python3/dist-packages/featheros
 cp -a "${BUILD_TMP}/compat/featheros" /usr/lib/python3/dist-packages/featheros
 
@@ -76,7 +77,18 @@ from featheros.store import main
 raise SystemExit(main())
 EOF
 
-chmod 0755 /usr/local/bin/feather-run /usr/local/bin/feather-compat /usr/local/bin/feather-ctl /usr/local/bin/feather-store
+cat > /usr/local/bin/feather-settings <<'EOF'
+#!/usr/bin/env python3
+from featheros.settings_hub import main
+raise SystemExit(main())
+EOF
+
+chmod 0755 \
+  /usr/local/bin/feather-run \
+  /usr/local/bin/feather-compat \
+  /usr/local/bin/feather-ctl \
+  /usr/local/bin/feather-store \
+  /usr/local/bin/feather-settings
 
 echo "[FeatherOS chroot] Configuring live user '${LIVE_USER}'..."
 if ! id -u "${LIVE_USER}" >/dev/null 2>&1; then
@@ -87,20 +99,27 @@ echo "root:feather" | chpasswd
 echo "${LIVE_USER} ALL=(ALL) NOPASSWD: ALL" > "/etc/sudoers.d/90-${LIVE_USER}"
 chmod 0440 "/etc/sudoers.d/90-${LIVE_USER}"
 
-# Ensure skeleton configs are applied to live user home
+# Apply Windows 11 Dark Glass skeleton configs to live user home
 cp -a /etc/skel/. "/home/${LIVE_USER}/"
 chown -R "${LIVE_USER}:${LIVE_USER}" "/home/${LIVE_USER}"
 
-echo "[FeatherOS chroot] Configuring locales, services, Plymouth, and MIME database..."
+echo "[FeatherOS chroot] Configuring locales, fast-boot services, Plymouth, icons & MIME database..."
 sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen || true
 locale-gen || true
 echo 'LANG=en_US.UTF-8' > /etc/default/locale
 
-systemctl enable lightdm NetworkManager || true
-systemctl enable zramswap || true
+systemctl enable lightdm NetworkManager zramswap || true
+systemctl enable bluetooth || true
+
+# Disable slow background timers during live boot for snappier responsiveness
+systemctl disable apt-daily.timer apt-daily-upgrade.timer man-db.timer dpkg-db-backup.timer fstrim.timer 2>/dev/null || true
 
 if command -v plymouth-set-default-theme >/dev/null 2>&1; then
   plymouth-set-default-theme featheros || true
+fi
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+  gtk-update-icon-cache -f /usr/share/icons/hicolor || true
 fi
 
 update-desktop-database /usr/share/applications || true

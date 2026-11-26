@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+  <action>
+    <icon>utilities-terminal</icon>
+    <name>Open Terminal Here</name>
+    <submenu></submenu>
+    <unique-id>1700000000001-1</unique-id>
+    <command>xfce4-terminal --working-directory=%f</command>
+    <description>Open a FeatherOS terminal in this folder</description>
+    <range></range>
+    <patterns>*</patterns>
+    <directories/>
+  </action>
+  <action>
+    <icon>application-x-ms-dos-executable</icon>
+    <name>Run in Isolated Bottle (FeatherRun)</name>
+    <submenu></submenu>
+    <unique-id>1700000000002-2</unique-id>
+    <command>feather-run --isolated %f</command>
+    <description>Launch this Windows .exe or .msi inside its own dedicated FeatherOS bottle</description>
+    <range></range>
+    <patterns>*.exe;*.EXE;*.msi;*.MSI</patterns>
+    <other-files/>
+  </action>
+  <action>
+    <icon>dialog-information</icon>
+    <name>Inspect Windows Binary (.exe / .msi)</name>
+    <submenu></submenu>
+    <unique-id>1700000000003-3</unique-id>
+    <command>xfce4-terminal -e "sh -c 'feather-run inspect \"$1\"; echo; read -p \"Press Enter...\"'" sh %f</command>
+    <description>Show architecture, subsystem, and installer details for a Windows binary</description>
+    <range></range>
+    <patterns>*.exe;*.EXE;*.msi;*.MSI;*.dll;*.DLL</patterns>
+    <other-files/>
+  </action>
+</actions>

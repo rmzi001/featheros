@@ -1,16 +1,18 @@
 # FeatherOS — Session State
 
-**Current Phase:** Phase 5 Complete — Installing QEMU & Preparing ISO Build
+**Status:** v0.1.0 (Plume) Released & Empirically Boot-Verified
 **SPEC Status:** FINALIZED
 **Last Updated:** 2026-11-26
 
-## Verification Captured
-- `python -m unittest discover -s tests -t . -v`: 28/28 tests passed
-- `python scripts/validate-build.py`: PASSED (required files, LF line endings, Debian package lists, Calamares, XML/SVG/`.desktop`)
-- Live GUI screenshots captured & verified for `feather-compat` and `feather-store`
-- `bash -n` / `sh -n` on all 5 Linux scripts: exit code 0
+## Published Release
+- **GitHub Repository:** https://github.com/rmzi001/featheros
+- **GitHub Release (`v0.1.0`):** https://github.com/rmzi001/featheros/releases/tag/v0.1.0
+- **Bootable ISO:** `featheros-0.1.0-amd64.iso` (1,444.26 MB / ~1.41 GiB, hybrid UEFI + Legacy BIOS + Rufus `/EFI/BOOT` tree)
+- **SHA256:** `22e1b5fcf79f43eb609f15cac709b259818da54f9fe93120bb1a48e7f7d27d19`
+- **CI Run #4 (100% green):** https://github.com/rmzi001/featheros/actions/runs/45781090020
 
-## Host Constraints Found
-- `IsAdmin: True`, `Winget: True`, `FreeGB: 20`
-- `VirtualizationEnabled: False` (BIOS VT-x/AMD-V off -> QEMU uses TCG software mode; GitHub Actions cloud runner is the cleanest zero-VT-x path to build `featheros-0.1.0-amd64.iso`)
-- `GhCli: False` (no GitHub CLI / global git auth yet)
+## Empirical Verification Captured
+- **Python unit, overlay & build pipeline tests:** 28/28 passed locally and on GitHub Actions (`ubuntu-latest`)
+- **Static build & LF validator (`scripts/validate-build.py`):** PASSED
+- **Live KVM QEMU boot-test:** Booted cleanly from BIOS GRUB -> Linux kernel -> systemd (`zramswap`, `NetworkManager`, `lightdm.service`) -> Openbox FeatherDark + Tint2 Windows-style taskbar + PCManFM wallpaper + Calamares Desktop icon + GTK3 Welcome App Hub (`feather-store`) in under 21 seconds.
+- **Visual proof:** Live QEMU desktop screenshot (`boot-desktop.png`, 71.5 KB) verified.

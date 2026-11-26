@@ -1,32 +1,45 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#070b14"/>
-      <stop offset="50%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#13233d"/>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#050814"/>
+      <stop offset="50%" stop-color="#0a1224"/>
+      <stop offset="100%" stop-color="#060b18"/>
     </linearGradient>
-    <radialGradient id="glow" cx="50%" cy="46%" r="42%">
-      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.22"/>
-      <stop offset="60%" stop-color="#0284c7" stop-opacity="0.06"/>
-      <stop offset="100%" stop-color="#070b14" stop-opacity="0"/>
+    <radialGradient id="aura" cx="52%" cy="48%" r="46%">
+      <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.34"/>
+      <stop offset="48%" stop-color="#2563eb" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#050814" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="plume" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#0284c7"/>
-      <stop offset="55%" stop-color="#38bdf8"/>
-      <stop offset="100%" stop-color="#bae6fd"/>
+    <linearGradient id="petal1" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.92"/>
+      <stop offset="50%" stop-color="#38bdf8" stop-opacity="0.88"/>
+      <stop offset="100%" stop-color="#e0f2fe" stop-opacity="0.95"/>
+    </linearGradient>
+    <linearGradient id="petal2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.85"/>
+      <stop offset="55%" stop-color="#1d4ed8" stop-opacity="0.82"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="petal3" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#7dd3fc" stop-opacity="0.88"/>
+      <stop offset="60%" stop-color="#0369a1" stop-opacity="0.82"/>
+      <stop offset="100%" stop-color="#1e1b4b" stop-opacity="0.88"/>
+    </linearGradient>
+    <linearGradient id="petal4" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e3a8a" stop-opacity="0.85"/>
+      <stop offset="60%" stop-color="#3b82f6" stop-opacity="0.78"/>
+      <stop offset="100%" stop-color="#bae6fd" stop-opacity="0.9"/>
     </linearGradient>
   </defs>
-  <rect width="1920" height="1080" fill="url(#bg)"/>
-  <rect width="1920" height="1080" fill="url(#glow)"/>
-  <!-- Subtle ambient geometric waves -->
-  <path d="M0 780 Q480 680 960 760 T1920 700 L1920 1080 L0 1080 Z" fill="#0b1324" opacity="0.7"/>
-  <path d="M0 860 Q540 790 1080 850 T1920 810 L1920 1080 L0 1080 Z" fill="#09101f" opacity="0.85"/>
-  <!-- Minimal stylized feather emblem -->
-  <g transform="translate(960 470)">
-    <path d="M-95 105 C-65 15, 25 -85, 118 -118 C92 -28, 34 44, -45 86 C-62 95, -78 100, -95 105 Z" fill="url(#plume)" opacity="0.92"/>
-    <path d="M-112 128 C-54 68, 12 4, 112 -112" stroke="#e0f2fe" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.85"/>
-    <path d="M-18 22 L38 -8 M8 -8 L64 -42 M-44 52 L10 26" stroke="#0f172a" stroke-width="3.5" stroke-linecap="round" opacity="0.55"/>
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+  <rect width="1920" height="1080" fill="url(#aura)"/>
+  <!-- Modern Windows 11 Dark Bloom style translucent glass ribbons -->
+  <g transform="translate(960 520)">
+    <path d="M-380 120 C-290 -160, -20 -310, 320 -250 C140 -60, -40 160, -380 120 Z" fill="url(#petal2)" opacity="0.82"/>
+    <path d="M-240 250 C-190 -40, 60 -250, 420 -170 C240 40, 20 260, -240 250 Z" fill="url(#petal3)" opacity="0.86"/>
+    <path d="M-430 -20 C-170 -240, 140 -210, 360 110 C80 170, -210 170, -430 -20 Z" fill="url(#petal4)" opacity="0.76"/>
+    <path d="M-280 190 C-120 -60, 110 -220, 350 -130 C210 50, 30 220, -280 190 Z" fill="url(#petal1)" opacity="0.90"/>
+    <path d="M-260 175 C-90 -20, 95 -165, 315 -115" stroke="#f0f9ff" stroke-width="3" fill="none" opacity="0.55"/>
+    <path d="M-360 100 C-160 -95, 70 -205, 290 -210" stroke="#bae6fd" stroke-width="2" fill="none" opacity="0.38"/>
   </g>
-  <text x="960" y="655" text-anchor="middle" fill="#e2e8f0" font-family="DejaVu Sans, Sans, Arial" font-size="34" font-weight="600" letter-spacing="8">FEATHEROS</text>
-  <text x="960" y="692" text-anchor="middle" fill="#64748b" font-family="DejaVu Sans, Sans, Arial" font-size="14" letter-spacing="4">LIGHTWEIGHT  •  WINDOWS-COMPATIBLE</text>
 </svg>

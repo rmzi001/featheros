@@ -18,7 +18,11 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 
 if (-not $IsoPath) {
-    $IsoPath = Join-Path $RepoRoot "dist\featheros-0.1.0-amd64.iso"
+    $IsoPath = Join-Path $RepoRoot "dist\featheros-0.2.0-amd64.iso"
+    if (-not (Test-Path $IsoPath)) {
+        $Latest = Get-ChildItem (Join-Path $RepoRoot "dist\featheros-*.iso") -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($Latest) { $IsoPath = $Latest.FullName }
+    }
 }
 
 if (-not (Test-Path $IsoPath)) {
@@ -26,8 +30,9 @@ if (-not (Test-Path $IsoPath)) {
     exit 1
 }
 
-$QemuBin = Get-Command "qemu-system-x86_64.exe" -ErrorAction SilentlyContinue
-$QemuExe = if ($QemuBin) { $QemuBin.Source } elseif (Test-Path "C:\Program Files\qemu\qemu-system-x86_64.exe") { "C:\Program Files\qemu\qemu-system-x86_64.exe" } else { $null }
+$QemuBin = Get-Command "qemu-system-x86_64w.exe" -ErrorAction SilentlyContinue
+if (-not $QemuBin) { $QemuBin = Get-Command "qemu-system-x86_64.exe" -ErrorAction SilentlyContinue }
+$QemuExe = if ($QemuBin) { $QemuBin.Source } elseif (Test-Path "C:\Program Files\qemu\qemu-system-x86_64w.exe") { "C:\Program Files\qemu\qemu-system-x86_64w.exe" } elseif (Test-Path "C:\Program Files\qemu\qemu-system-x86_64.exe") { "C:\Program Files\qemu\qemu-system-x86_64.exe" } else { $null }
 
 if (-not $QemuExe) {
     Write-Error "QEMU not found. Run '.\scripts\setup-windows-host.ps1 -InstallQemu' or install via winget."
@@ -52,8 +57,9 @@ $ArgsList = @(
     "-smp", "$Cpus",
     "-cdrom", "$IsoPath",
     "-boot", "d",
-    "-vga", "virtio",
+    "-vga", "std",
     "-display", "sdl,gl=off",
+    "-name", "FeatherOS",
     "-netdev", "user,id=net0",
     "-device", "virtio-net-pci,netdev=net0",
     "-usb",

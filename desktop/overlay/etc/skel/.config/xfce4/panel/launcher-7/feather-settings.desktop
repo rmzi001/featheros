@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Settings
+Comment=FeatherOS System Settings (Display, Wi-Fi, Bluetooth, Sound, Themes, Updates)
+Exec=feather-settings
+Icon=preferences-system
+Terminal=false
+StartupNotify=true

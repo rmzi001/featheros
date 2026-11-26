@@ -18,6 +18,7 @@ from typing import Any, Callable, Sequence
 
 from . import __version__
 from .ctl import collect_system_status
+from .fluent_theme import apply_fluent_gtk_theme
 from .runners import list_installed_runners
 from .system_probe import SystemProbe, probe_system
 
@@ -286,6 +287,8 @@ def _run_gtk_store(controller: StoreController) -> int:
     gi.require_version("Gtk", "3.0")
     from gi.repository import Gtk  # type: ignore[import-not-found]
 
+    apply_fluent_gtk_theme()
+
     class FeatherStoreWindow(Gtk.Window):
         def __init__(self) -> None:
             super().__init__(title=f"Welcome to FeatherOS v{__version__} — App Hub")
@@ -296,16 +299,21 @@ def _run_gtk_store(controller: StoreController) -> int:
             self.add(root)
 
             title = Gtk.Label(xalign=0)
+            title.get_style_context().add_class("feather-title")
             title.set_markup(
-                f"<b><big>Welcome to FeatherOS</big></b>  <small>v{__version__} (Plume)</small>\n"
-                "<small>Lightweight Debian desktop with built-in Windows .exe/.msi compatibility.</small>"
+                f"<b><big>Welcome to FeatherOS</big></b>  <small>v{__version__} (Plume Fluent)</small>\n"
+                "<small>Modern lightweight Windows-compatible OS with built-in .exe/.msi support.</small>"
             )
             root.pack_start(title, False, False, 0)
 
             quick = Gtk.Box(spacing=8)
-            btn_compat = Gtk.Button(label="Open Compatibility Manager")
+            btn_compat = Gtk.Button(label="Compatibility Manager")
+            btn_compat.get_style_context().add_class("feather-primary")
             btn_compat.connect("clicked", lambda _b: subprocess.Popen(["feather-compat"]))
             quick.pack_start(btn_compat, False, False, 0)
+            btn_settings = Gtk.Button(label="System Settings")
+            btn_settings.connect("clicked", lambda _b: subprocess.Popen(["feather-settings"]))
+            quick.pack_start(btn_settings, False, False, 0)
             if controller.has_calamares_installer():
                 btn_install = Gtk.Button(label="Install FeatherOS to Disk")
                 btn_install.connect("clicked", lambda _b: subprocess.Popen(["pkexec", "calamares"]))
@@ -316,6 +324,7 @@ def _run_gtk_store(controller: StoreController) -> int:
             root.pack_start(notebook, True, True, 0)
 
             self.status_lbl = Gtk.Label(label="Choose an app to install.", xalign=0)
+            self.status_lbl.get_style_context().add_class("feather-subtitle")
             root.pack_start(self.status_lbl, False, False, 0)
 
             for cat in VALID_CATEGORIES:
@@ -323,10 +332,13 @@ def _run_gtk_store(controller: StoreController) -> int:
                 box.set_border_width(10)
                 for item in controller.list_apps(category=cat):
                     row = Gtk.Box(spacing=10)
+                    row.get_style_context().add_class("feather-card")
                     badge = " [Installed]" if item["installed"] else f" ({item['size_hint']})"
                     lbl = Gtk.Label(xalign=0)
                     lbl.set_markup(f"<b>{item['name']}</b><small>{badge}</small>\n<small>{item['summary']}</small>")
                     btn = Gtk.Button(label="Installed" if item["installed"] else "Install")
+                    if not item["installed"]:
+                        btn.get_style_context().add_class("feather-primary")
                     btn.set_sensitive(not item["installed"])
                     btn.connect("clicked", self._on_install, item["id"])
                     row.pack_start(lbl, True, True, 0)

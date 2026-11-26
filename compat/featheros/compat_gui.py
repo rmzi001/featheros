@@ -22,6 +22,7 @@ from .bottles import (
     VALID_WINDOWS_VERSIONS,
 )
 from .ctl import PROFILES, apply_profile, collect_system_status, get_active_profile
+from .fluent_theme import apply_fluent_gtk_theme
 from .runners import RUNTIME_PRESETS, InstalledRunner, list_installed_runners
 from .shortcuts import WindowsShortcut, discover_bottle_shortcuts, prune_bottle_shortcuts, sync_bottle_shortcuts
 from .system_probe import SystemProbe, probe_system
@@ -132,6 +133,8 @@ def _run_gtk_gui(controller: CompatController) -> int:
 
     gi.require_version("Gtk", "3.0")
     from gi.repository import Gtk  # type: ignore[import-not-found]
+
+    apply_fluent_gtk_theme()
 
     class FeatherCompatWindow(Gtk.Window):
         def __init__(self) -> None:

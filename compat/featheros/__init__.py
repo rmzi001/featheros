@@ -1,4 +1,4 @@
-"""FeatherOS Windows compatibility layer and system control suite."""
+"""FeatherOS Windows compatibility layer, settings hub, and system control suite."""
 
-__version__ = "0.1.0"
-__codename__ = "plume"
+__version__ = "0.2.0"
+__codename__ = "plume-fluent"

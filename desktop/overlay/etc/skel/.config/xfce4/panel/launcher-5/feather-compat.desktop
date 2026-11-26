@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Windows Compatibility Manager
+Comment=Manage Windows .exe/.msi bottles, DXVK, Vulkan, and runtimes
+Exec=feather-compat
+Icon=application-x-ms-dos-executable
+Terminal=false
+StartupNotify=true

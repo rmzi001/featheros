@@ -1,0 +1,144 @@
+/* FeatherWin11-Dark: Windows 11 Dark Glass (Fluent) GTK3 Theme for FeatherOS */
+@import url("resource:///org/gtk/libgtk/theme/Adwaita/gtk-contained-dark.css");
+
+@define-color theme_bg_color #141821;
+@define-color theme_fg_color #f1f5f9;
+@define-color theme_base_color #1b2130;
+@define-color theme_text_color #f8fafc;
+@define-color theme_selected_bg_color #0284c7;
+@define-color theme_selected_fg_color #ffffff;
+@define-color insensitive_bg_color #10141c;
+@define-color insensitive_fg_color #64748b;
+@define-color borders rgba(255, 255, 255, 0.09);
+
+window, .background {
+    background-color: #141821;
+    color: #f1f5f9;
+}
+
+headerbar, .titlebar {
+    background-color: #10141c;
+    background-image: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: none;
+}
+
+button {
+    background-image: none;
+    background-color: #222938;
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 7px;
+    box-shadow: none;
+    transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+button:hover {
+    background-color: #2d374c;
+    border-color: rgba(56, 189, 248, 0.55);
+}
+
+button:checked, button.suggested-action {
+    background-color: #0284c7;
+    color: #ffffff;
+    border-color: #38bdf8;
+}
+
+entry, combobox button, spinbutton {
+    background-color: #1b2130;
+    color: #f8fafc;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 7px;
+}
+
+entry:focus {
+    border-color: #38bdf8;
+    box-shadow: 0 0 0 1px #38bdf8;
+}
+
+menu, .menu, .context-menu {
+    background-color: rgba(20, 24, 33, 0.96);
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 4px;
+}
+
+menu menuitem {
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+
+menu menuitem:hover {
+    background-color: rgba(56, 189, 248, 0.22);
+    color: #ffffff;
+}
+
+/* Windows 11 Dark Glass Taskbar (xfce4-panel) */
+.xfce4-panel.background {
+    background-color: rgba(15, 20, 30, 0.88);
+    border-top: 1px solid rgba(255, 255, 255, 0.11);
+    color: #f1f5f9;
+}
+
+.xfce4-panel button {
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 7px;
+    margin: 3px 2px;
+    padding: 2px 6px;
+}
+
+.xfce4-panel button:hover {
+    background-color: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.xfce4-panel button:checked, .xfce4-panel .tasklist button:checked {
+    background-color: rgba(56, 189, 248, 0.18);
+    border-bottom: 2px solid #38bdf8;
+}
+
+/* Windows 11 Rounded Dark Glass Start Menu (Whisker Menu) */
+#whiskermenu-window {
+    background-color: rgba(18, 23, 34, 0.96);
+    color: #f1f5f9;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 12px;
+}
+
+#whiskermenu-window entry {
+    background-color: #10141c;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    border-radius: 20px;
+    padding: 6px 14px;
+}
+
+#whiskermenu-window treeview, #whiskermenu-window iconview {
+    background-color: transparent;
+    color: #e2e8f0;
+}
+
+#whiskermenu-window treeview:selected, #whiskermenu-window iconview:selected {
+    background-color: rgba(56, 189, 248, 0.22);
+    color: #ffffff;
+    border-radius: 8px;
+}
+
+/* Thunar Modern File Explorer Sidebar */
+.thunar .sidebar {
+    background-color: #10141c;
+    border-right: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.thunar .standard-view {
+    background-color: #141821;
+}
+
+/* Windows 11 Dark Glass Notifications */
+#XfceNotifyWindow {
+    background-color: rgba(20, 25, 36, 0.96);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 12px;
+    color: #f8fafc;
+}

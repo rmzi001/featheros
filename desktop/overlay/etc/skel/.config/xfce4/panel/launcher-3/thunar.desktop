@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=File Explorer
+Comment=Browse files, folders, USB drives, and Windows C: Drive
+Exec=thunar %F
+Icon=system-file-manager
+Terminal=false
+StartupNotify=true

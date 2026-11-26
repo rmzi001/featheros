@@ -91,11 +91,17 @@ def get_active_profile(config_dir: str | Path | None = None) -> PerformanceProfi
 
 
 def build_profile_actions(profile: PerformanceProfile) -> list[list[str]]:
-    """Compute the non-privileged desktop actions needed to switch to a profile."""
+    """Compute non-privileged desktop actions for XFCE 4.20 (with Openbox/picom fallback)."""
     actions: list[list[str]] = []
     if profile.compositor_enabled:
+        actions.append(
+            ["xfconf-query", "-c", "xfwm4", "-p", "/general/use_compositing", "-s", "true"]
+        )
         actions.append(["picom", "--config", "/etc/xdg/featheros/picom.conf", "-b"])
     else:
+        actions.append(
+            ["xfconf-query", "-c", "xfwm4", "-p", "/general/use_compositing", "-s", "false"]
+        )
         actions.append(["pkill", "-x", "picom"])
     return actions
 
