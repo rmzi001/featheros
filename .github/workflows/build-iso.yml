@@ -27,7 +27,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Unpack initial source archive if present
+      - name: Unpack source update archive if present
         run: |
           if [ -f featheros-src.tar.gz ]; then
             tar -xzf featheros-src.tar.gz --exclude='.github/workflows*'
@@ -36,7 +36,7 @@ jobs:
             git config user.email "ci@featheros.local"
             git add -A
             if ! git diff --cached --quiet; then
-              git commit -m "chore(bootstrap): unpack FeatherOS source tree [skip ci]"
+              git commit -m "chore(sync): unpack updated FeatherOS source tree [skip ci]"
               git push origin HEAD:main
             fi
           fi
@@ -186,13 +186,14 @@ jobs:
             dist/*.sha256
           retention-days: 14
 
-      - name: Publish FeatherOS v0.1.0 Release with ISO & Boot Proof
+      - name: Publish FeatherOS Release with ISO & Boot Proof
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG="v0.1.0"
-          TITLE="FeatherOS 0.1.0 (Plume)"
-          NOTES="Lightweight Debian-based OS with FeatherShell desktop, FeatherRun Windows .exe/.msi compatibility layer, FeatherStore App Hub, and Calamares installer. Includes automated KVM QEMU boot-test screenshots."
+          source config/featheros.conf
+          TAG="v${OS_VERSION}"
+          TITLE="${OS_PRETTY_NAME}"
+          NOTES="Windows 11 Dark Glass lightweight Debian OS (XFCE 4.20 + centered taskbar + Whisker Start Menu + FeatherSettings + FeatherRun Windows .exe/.msi compatibility + FeatherStore + Calamares installer). Includes live KVM QEMU boot-test screenshots."
           if gh release view "${TAG}" >/dev/null 2>&1; then
             gh release upload "${TAG}" dist/featheros-*.iso dist/featheros-*.sha256 dist/boot-early.png dist/boot-desktop.png dist/qemu-serial.log --clobber
           else
