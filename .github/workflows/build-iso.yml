@@ -147,7 +147,10 @@ jobs:
           sleep "${WAIT_DESKTOP}"
           echo "screendump dist/boot-desktop.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock
 
-          # Exercise Whisker Start Menu (Win key) and FeatherSettings (Win+I) live inside VM
+          # Close Welcome Hub to capture clean Dark Bloom desktop, then test Start Menu (Win) & Settings (Win+I)
+          echo "sendkey alt-f4" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+          sleep 2
+          echo "screendump dist/boot-clean-desktop.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
           echo "sendkey meta_l" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
           sleep 3
           echo "screendump dist/boot-startmenu.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
@@ -168,7 +171,7 @@ jobs:
           echo "quit" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
           wait "${QEMU_PID}" || true
 
-          for f in dist/boot-early.ppm dist/boot-desktop.ppm dist/boot-startmenu.ppm dist/boot-settings.ppm; do
+          for f in dist/boot-early.ppm dist/boot-desktop.ppm dist/boot-clean-desktop.ppm dist/boot-startmenu.ppm dist/boot-settings.ppm; do
             if [ -s "${f}" ]; then
               pnmtopng "${f}" > "${f%.ppm}.png"
               rm -f "${f}"
@@ -185,6 +188,7 @@ jobs:
           # Empirical checks: screenshots, serial boot, in-OS QA scorecard & live Wine Win32 execution
           test -s dist/boot-early.png
           test -s dist/boot-desktop.png
+          test -s dist/boot-clean-desktop.png
           test -s dist/boot-startmenu.png
           test -s dist/boot-settings.png
           test -s dist/qemu-serial.log
