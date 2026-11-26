@@ -1,0 +1,160 @@
+name: FeatherOS CI & ISO Builder
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      debian_suite:
+        description: "Debian suite (trixie or bookworm)"
+        required: false
+        default: "trixie"
+      build_iso:
+        description: "Build bootable Live ISO artifact"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    name: Test FeatherRun, Overlay & Build Scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Unpack initial source archive if present
+        run: |
+          if [ -f featheros-src.tar.gz ]; then
+            tar -xzf featheros-src.tar.gz --exclude='.github/workflows*'
+            rm -f featheros-src.tar.gz
+            git config user.name "FeatherOS CI"
+            git config user.email "ci@featheros.local"
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "chore(bootstrap): unpack FeatherOS source tree [skip ci]"
+              git push origin HEAD:main
+            fi
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run Python unit & overlay tests
+        run: python3 -m unittest discover -s tests -t . -v
+
+      - name: Run build integrity validator
+        run: python3 scripts/validate-build.py
+
+      - name: Check bash syntax of build and VM scripts
+        run: |
+          bash -n build/build-iso.sh
+          bash -n build/chroot-setup.sh
+          bash -n scripts/run-qemu.sh
+          sh -n desktop/overlay/etc/xdg/openbox/autostart
+          sh -n desktop/overlay/usr/local/bin/feather-firstboot
+
+  build-iso:
+    name: Build Bootable FeatherOS ISO & QEMU Boot-Test
+    needs: verify
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.build_iso) ||
+      startsWith(github.ref, 'refs/tags/v') ||
+      contains(github.event.head_commit.message, '[build-iso]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout latest main or tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/') && 'main' || github.ref }}
+
+      - name: Ensure source unpacked
+        run: |
+          if [ -f featheros-src.tar.gz ]; then
+            tar -xzf featheros-src.tar.gz --exclude='.github/workflows*'
+            rm -f featheros-src.tar.gz
+          fi
+
+      - name: Install ISO build & QEMU boot-test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            debian-archive-keyring \
+            debootstrap \
+            dosfstools \
+            grub-common \
+            grub-efi-amd64-bin \
+            grub-pc-bin \
+            mtools \
+            netpbm \
+            qemu-system-x86 \
+            socat \
+            squashfs-tools \
+            xorriso
+
+      - name: Build FeatherOS Live ISO
+        env:
+          DEBIAN_SUITE: ${{ inputs.debian_suite || 'trixie' }}
+        run: sudo -E bash build/build-iso.sh
+
+      - name: Boot-test FeatherOS ISO in QEMU & capture live desktop screenshots
+        run: |
+          ISO_FILE="$(ls dist/featheros-*.iso | head -n 1)"
+          ACCEL="-accel tcg"
+          WAIT_BOOT=110
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm || true
+          fi
+          if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
+            ACCEL="-enable-kvm -cpu host"
+            WAIT_BOOT=45
+          fi
+          echo "Boot-testing ${ISO_FILE} with QEMU (${ACCEL})..."
+          qemu-system-x86_64 ${ACCEL} \
+            -m 2048 -smp 2 \
+            -cdrom "${ISO_FILE}" \
+            -boot d \
+            -vga std \
+            -display none \
+            -monitor unix:/tmp/qemu-mon.sock,server,nowait \
+            -serial file:dist/qemu-serial.log &
+          QEMU_PID=$!
+          sleep 20
+          echo "screendump dist/boot-early.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+          sleep "${WAIT_BOOT}"
+          echo "screendump dist/boot-desktop.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+          echo "quit" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+          wait "${QEMU_PID}" || true
+          for f in dist/boot-early.ppm dist/boot-desktop.ppm; do
+            if [ -f "${f}" ]; then
+              pnmtopng "${f}" > "${f%.ppm}.png"
+              rm -f "${f}"
+            fi
+          done
+          ls -lh dist/
+          tail -n 60 dist/qemu-serial.log || true
+
+      - name: Upload QEMU boot-test proof (screenshots, serial log & checksum)
+        uses: actions/upload-artifact@v4
+        with:
+          name: featheros-boot-proof
+          path: |
+            dist/*.png
+            dist/*.sha256
+            dist/qemu-serial.log
+          retention-days: 14
+
+      - name: Upload FeatherOS ISO & SHA256 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: featheros-live-iso
+          path: |
+            dist/*.iso
+            dist/*.sha256
+          retention-days: 14
