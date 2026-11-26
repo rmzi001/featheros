@@ -101,21 +101,27 @@ jobs:
       - name: Build FeatherOS Live ISO
         env:
           DEBIAN_SUITE: ${{ inputs.debian_suite || 'trixie' }}
-        run: sudo -E bash build/build-iso.sh
+        run: |
+          sudo -E bash build/build-iso.sh
+          sudo chown -R "$(id -u):$(id -g)" dist
 
       - name: Boot-test FeatherOS ISO in QEMU & capture live desktop screenshots
         run: |
+          set -euo pipefail
           ISO_FILE="$(ls dist/featheros-*.iso | head -n 1)"
           ACCEL="-accel tcg"
-          WAIT_BOOT=110
+          WAIT_EARLY=25
+          WAIT_DESKTOP=115
           if [ -e /dev/kvm ]; then
             sudo chmod 666 /dev/kvm || true
           fi
           if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
             ACCEL="-enable-kvm -cpu host"
-            WAIT_BOOT=45
+            WAIT_EARLY=18
+            WAIT_DESKTOP=55
           fi
           echo "Boot-testing ${ISO_FILE} with QEMU (${ACCEL})..."
+          rm -f /tmp/qemu-mon.sock dist/qemu-serial.log dist/boot-*.ppm dist/boot-*.png
           qemu-system-x86_64 ${ACCEL} \
             -m 2048 -smp 2 \
             -cdrom "${ISO_FILE}" \
@@ -125,20 +131,35 @@ jobs:
             -monitor unix:/tmp/qemu-mon.sock,server,nowait \
             -serial file:dist/qemu-serial.log &
           QEMU_PID=$!
-          sleep 20
-          echo "screendump dist/boot-early.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
-          sleep "${WAIT_BOOT}"
-          echo "screendump dist/boot-desktop.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
+
+          sleep 3
+          if ! kill -0 "${QEMU_PID}" 2>/dev/null; then
+            echo "ERROR: QEMU exited unexpectedly right after start!" >&2
+            exit 1
+          fi
+
+          sleep "${WAIT_EARLY}"
+          echo "screendump dist/boot-early.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock
+          sleep "${WAIT_DESKTOP}"
+          echo "screendump dist/boot-desktop.ppm" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock
           echo "quit" | socat - UNIX-CONNECT:/tmp/qemu-mon.sock || true
           wait "${QEMU_PID}" || true
+
           for f in dist/boot-early.ppm dist/boot-desktop.ppm; do
-            if [ -f "${f}" ]; then
-              pnmtopng "${f}" > "${f%.ppm}.png"
-              rm -f "${f}"
-            fi
+            test -s "${f}"
+            pnmtopng "${f}" > "${f%.ppm}.png"
+            rm -f "${f}"
           done
+
+          # Empirical check: verify screenshots exist and serial log captured Linux kernel boot
+          test -s dist/boot-early.png
+          test -s dist/boot-desktop.png
+          test -s dist/qemu-serial.log
+          grep -q "Linux version" dist/qemu-serial.log
+          echo "=== FeatherOS QEMU Boot-Test PASSED ==="
           ls -lh dist/
-          tail -n 60 dist/qemu-serial.log || true
+          echo "=== Tail of qemu-serial.log ==="
+          tail -n 50 dist/qemu-serial.log
 
       - name: Upload QEMU boot-test proof (screenshots, serial log & checksum)
         uses: actions/upload-artifact@v4
@@ -158,3 +179,16 @@ jobs:
             dist/*.iso
             dist/*.sha256
           retention-days: 14
+
+      - name: Publish FeatherOS v0.1.0 Release with ISO & Boot Proof
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v0.1.0"
+          TITLE="FeatherOS 0.1.0 (Plume)"
+          NOTES="Lightweight Debian-based OS with FeatherShell desktop, FeatherRun Windows .exe/.msi compatibility layer, FeatherStore App Hub, and Calamares installer. Includes automated KVM QEMU boot-test screenshots."
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" dist/featheros-*.iso dist/featheros-*.sha256 dist/boot-early.png dist/boot-desktop.png dist/qemu-serial.log --clobber
+          else
+            gh release create "${TAG}" dist/featheros-*.iso dist/featheros-*.sha256 dist/boot-early.png dist/boot-desktop.png dist/qemu-serial.log --title "${TITLE}" --notes "${NOTES}"
+          fi
