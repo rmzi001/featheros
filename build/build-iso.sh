@@ -134,6 +134,10 @@ mformat -i "${ISO_STAGE}/boot/grub/efiboot.img" -F ::
 mmd -i "${ISO_STAGE}/boot/grub/efiboot.img" ::/EFI ::/EFI/BOOT
 mcopy -i "${ISO_STAGE}/boot/grub/efiboot.img" "${WORK_DIR}/bootx64.efi" ::/EFI/BOOT/BOOTX64.EFI
 
+# Also mirror /EFI/BOOT/BOOTX64.EFI in the ISO tree for Windows USB tools (e.g. Rufus ISO mode)
+mkdir -p "${ISO_STAGE}/EFI/BOOT"
+cp "${WORK_DIR}/bootx64.efi" "${ISO_STAGE}/EFI/BOOT/BOOTX64.EFI"
+
 # Build Legacy BIOS boot image
 grub-mkstandalone \
   --format=i386-pc \
