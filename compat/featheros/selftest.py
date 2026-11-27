@@ -66,6 +66,10 @@ def _default_run(cmd: list[str], timeout: int = 20) -> tuple[int, str]:
     if cmd and "wine" in Path(cmd[0]).name.lower():
         env.setdefault("WINEDEBUG", "-all")
         env.setdefault("WINEDLLOVERRIDES", "mscoree,mshtml=")
+        if not env.get("WINEPREFIX"):
+            default_pfx = Path.home() / ".local" / "share" / "featheros" / "bottles" / "default" / "prefix"
+            if default_pfx.is_dir():
+                env["WINEPREFIX"] = str(default_pfx)
         xauth = env.get("XAUTHORITY", "")
         if env.get("DISPLAY") and xauth and not Path(xauth).is_file():
             env.pop("DISPLAY", None)
