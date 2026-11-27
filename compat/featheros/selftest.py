@@ -241,6 +241,7 @@ def run_selftest(
     # 7. Single Polkit auth agent installed & no duplicate autostart collision (8 pts)
     polkit_autostarts = _count_enabled_polkit_autostarts(root)
     polkit_candidates = (
+        root / "usr" / "libexec" / "polkit-mate-authentication-agent-1",
         root / "usr" / "lib" / "x86_64-linux-gnu" / "polkit-mate-authentication-agent-1",
         root / "usr" / "lib" / "mate-polkit" / "polkit-mate-authentication-agent-1",
         root / "usr" / "lib" / "policykit-1-gnome" / "polkit-gnome-authentication-agent-1",
