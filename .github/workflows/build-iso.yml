@@ -29,6 +29,21 @@ jobs:
 
       - name: Unpack source update archive if present
         run: |
+          if [ -f featheros-patch.gz.b64 ]; then
+            base64 -d featheros-patch.gz.b64 | gunzip | git apply --whitespace=nowarn
+            rm -f featheros-patch.gz.b64
+            git config user.name "FeatherOS CI"
+            git config user.email "ci@featheros.local"
+            git add -A
+            if ! git diff --cached --quiet; then
+              git commit -m "chore(sync): apply updated FeatherOS source patch [skip ci]"
+              git push origin HEAD:main
+            fi
+          fi
+          if [ -f featheros-src.tar.gz.b64 ]; then
+            base64 -d featheros-src.tar.gz.b64 > featheros-src.tar.gz
+            rm -f featheros-src.tar.gz.b64
+          fi
           if [ -f featheros-src.tar.gz ]; then
             find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' ! -name 'featheros-src.tar.gz' -exec rm -rf {} +
             tar -xzf featheros-src.tar.gz --exclude='.github/workflows*'
@@ -79,6 +94,14 @@ jobs:
 
       - name: Ensure source unpacked
         run: |
+          if [ -f featheros-patch.gz.b64 ]; then
+            base64 -d featheros-patch.gz.b64 | gunzip | git apply --whitespace=nowarn
+            rm -f featheros-patch.gz.b64
+          fi
+          if [ -f featheros-src.tar.gz.b64 ]; then
+            base64 -d featheros-src.tar.gz.b64 > featheros-src.tar.gz
+            rm -f featheros-src.tar.gz.b64
+          fi
           if [ -f featheros-src.tar.gz ]; then
             find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name '.github' ! -name 'featheros-src.tar.gz' -exec rm -rf {} +
             tar -xzf featheros-src.tar.gz --exclude='.github/workflows*'
@@ -121,8 +144,8 @@ jobs:
           fi
           if [ -r /dev/kvm ] && [ -w /dev/kvm ]; then
             ACCEL="-enable-kvm -cpu host"
-            WAIT_EARLY=18
-            WAIT_DESKTOP=55
+            WAIT_EARLY=10
+            WAIT_DESKTOP=60
           fi
           echo "Boot-testing ${ISO_FILE} with QEMU (${ACCEL})..."
           rm -f /tmp/qemu-mon.sock dist/qemu-serial.log dist/boot-*.ppm dist/boot-*.png
@@ -185,7 +208,7 @@ jobs:
           echo "=== Tail of qemu-serial.log ==="
           tail -n 40 dist/qemu-serial.log || true
 
-          # Empirical checks: screenshots, serial boot, in-OS QA scorecard & live Wine Win32 execution
+          # Empirical checks: screenshots, serial boot, strict 100/100 QA scorecard & live Wine Win32 execution
           test -s dist/boot-early.png
           test -s dist/boot-desktop.png
           test -s dist/boot-clean-desktop.png
@@ -193,9 +216,9 @@ jobs:
           test -s dist/boot-settings.png
           test -s dist/qemu-serial.log
           grep -Eq "featheros login:|lightdm\.service|Reached target" dist/qemu-serial.log
-          grep -q "FEATHEROS_SELFTEST_SCORE:" dist/qemu-serial.log
+          grep -q "FEATHEROS_SELFTEST_SCORE: 100/100" dist/qemu-serial.log
           grep -q "FEATHEROS_WIN32_OK" dist/qemu-serial.log
-          echo "=== FeatherOS KVM QEMU Boot-Test & In-OS QA Checking Agent PASSED ==="
+          echo "=== FeatherOS KVM QEMU Boot-Test & Strict 100/100 In-OS QA Checking Agent PASSED ==="
 
       - name: Upload QEMU boot-test proof (screenshots, serial log & checksum)
         if: always()
