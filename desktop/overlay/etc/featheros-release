@@ -1,7 +1,7 @@
-PRETTY_NAME="FeatherOS 0.4.0 (Plume Wholesome)"
+PRETTY_NAME="FeatherOS 0.5.0 (Plume Wholesome)"
 NAME="FeatherOS"
-VERSION_ID="0.4.0"
-VERSION="0.4.0 (Plume Wholesome)"
+VERSION_ID="0.5.0"
+VERSION="0.5.0 (Plume Wholesome)"
 VERSION_CODENAME=plume-wholesome
 ID=featheros
 ID_LIKE=debian

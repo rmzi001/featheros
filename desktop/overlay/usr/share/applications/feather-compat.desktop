@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=FeatherOS Compatibility Manager
-GenericName=Windows App Manager
-Comment=Manage Windows .exe/.msi bottles, DXVK/Vulkan settings, runtimes, and performance profiles
+Name=Windows Apps
+GenericName=FeatherOS Compatibility Manager
+Comment=Manage Windows .exe/.msi bottles, DXVK/Vulkan settings, runtimes, and GE-Proton
 Exec=feather-compat
 Icon=application-x-ms-dos-executable
 Terminal=false

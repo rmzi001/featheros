@@ -1,4 +1,4 @@
-# FeatherOS v0.4.0 Optional Apps, Hardware Firmware & Gaming Extras
+# FeatherOS v0.5.0 Optional Apps, Hardware Firmware & Gaming Extras
 # Installed best-effort per package so ISO builds stay portable across Debian suites.
 bluez
 blueman
@@ -15,7 +15,10 @@ firmware-linux
 firmware-iwlwifi
 firmware-realtek
 firmware-amd-graphics
+firmware-intel-graphics
+firmware-sof-signed
 firmware-atheros
 firmware-brcm80211
+firmware-mediatek
 intel-microcode
 amd64-microcode

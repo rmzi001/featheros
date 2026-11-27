@@ -22,6 +22,7 @@ from featheros.ctl import (
 )
 from featheros.runners import (
     RUNTIME_PRESETS,
+    _verify_sha512,
     fetch_latest_ge_proton,
     install_ge_proton,
     list_installed_runners,
@@ -138,6 +139,42 @@ class TestRunners(unittest.TestCase):
                         "tag_name": "GE-Proton9-25",
                         "assets": [{"name": "GE-Proton9-25.tar.gz", "browser_download_url": "http://evil/x.tar.gz"}],
                     }
+                )
+
+    def test_verify_sha512_fails_closed_on_missing_or_mismatched_hash(self) -> None:
+        import hashlib
+
+        with tempfile.TemporaryDirectory() as tmp:
+            sample = Path(tmp) / "GE-Proton9-25.tar.gz"
+            payload = b"featheros-ge-proton-test-bytes"
+            sample.write_bytes(payload)
+            good_hash = hashlib.sha512(payload).hexdigest()
+
+            # Valid checksum passes
+            _verify_sha512(sample, f"{good_hash}  GE-Proton9-25.tar.gz\n")
+            # Empty or malformed checksum fails closed
+            with self.assertRaises(ValueError):
+                _verify_sha512(sample, "")
+            with self.assertRaises(ValueError):
+                _verify_sha512(sample, "not-a-valid-sha512  GE-Proton9-25.tar.gz\n")
+            # Wrong hash fails closed
+            with self.assertRaises(ValueError):
+                _verify_sha512(sample, f"{'0' * 128}  GE-Proton9-25.tar.gz\n")
+
+            # install_ge_proton refuses extraction on SHA-512 mismatch
+            meta = {
+                "tag_name": "GE-Proton9-25",
+                "assets": [
+                    {"name": "GE-Proton9-25.sha512sum", "browser_download_url": "https://example/sha"},
+                    {"name": "GE-Proton9-25.tar.gz", "browser_download_url": "https://example/GE-Proton9-25.tar.gz"},
+                ],
+            }
+            with self.assertRaises(ValueError):
+                install_ge_proton(
+                    home=Path(tmp) / "home",
+                    fetcher=lambda _u: json.dumps(meta).encode("utf-8"),
+                    downloader=lambda _u, dst: dst.write_bytes(payload),
+                    sha512_fetcher=lambda _u: f"{'f' * 128}  GE-Proton9-25.tar.gz\n".encode("utf-8"),
                 )
 
 

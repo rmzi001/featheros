@@ -1,4 +1,4 @@
-"""feather-store: FeatherOS Welcome, Browser & Gaming App Hub (v0.3.0)."""
+"""feather-store: FeatherOS Welcome, Browser & Gaming App Hub (v0.5.0)."""
 
 from __future__ import annotations
 

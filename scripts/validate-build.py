@@ -69,14 +69,27 @@ REQUIRED_REPO_FILES = [
     "desktop/overlay/usr/local/share/applications/xfce4-terminal.desktop",
     "desktop/overlay/usr/local/share/applications/org.xfce.mousepad.desktop",
     "desktop/overlay/usr/local/share/applications/org.xfce.ristretto.desktop",
+    "desktop/overlay/usr/local/share/applications/mpv.desktop",
     "desktop/overlay/etc/systemd/system/feather-boot-report.service",
     "desktop/overlay/etc/calamares/settings.conf",
+    "desktop/overlay/etc/calamares/modules/welcome.conf",
+    "desktop/overlay/etc/calamares/modules/locale.conf",
+    "desktop/overlay/etc/calamares/modules/keyboard.conf",
+    "desktop/overlay/etc/calamares/modules/partition.conf",
+    "desktop/overlay/etc/calamares/modules/mount.conf",
     "desktop/overlay/etc/calamares/modules/unpackfs.conf",
-    "desktop/overlay/etc/calamares/modules/bootloader.conf",
+    "desktop/overlay/etc/calamares/modules/machineid.conf",
+    "desktop/overlay/etc/calamares/modules/fstab.conf",
     "desktop/overlay/etc/calamares/modules/users.conf",
     "desktop/overlay/etc/calamares/modules/removeuser.conf",
+    "desktop/overlay/etc/calamares/modules/displaymanager.conf",
     "desktop/overlay/etc/calamares/modules/packages.conf",
     "desktop/overlay/etc/calamares/modules/shellprocess.conf",
+    "desktop/overlay/etc/calamares/modules/initramfs.conf",
+    "desktop/overlay/etc/calamares/modules/grubcfg.conf",
+    "desktop/overlay/etc/calamares/modules/bootloader.conf",
+    "desktop/overlay/etc/calamares/modules/umount.conf",
+    "desktop/overlay/etc/calamares/modules/finished.conf",
     "desktop/overlay/etc/calamares/branding/featheros/branding.desc",
     "desktop/overlay/etc/calamares/branding/featheros/show.qml",
 ]
@@ -155,6 +168,12 @@ def check_package_lists() -> list[str]:
         "qml6-module-qtquick-window",
         "plymouth-label",
         "mate-polkit",
+        "wpasupplicant",
+        "wireless-regdb",
+        "libspa-0.2-bluetooth",
+        "systemd-timesyncd",
+        "ffmpegthumbnailer",
+        "whiptail",
         "firefox-esr",
         "xfce4-power-manager-plugins",
         "xfwm4",
@@ -237,6 +256,18 @@ def check_version_and_build_safety() -> list[str]:
     cal_settings = (REPO_ROOT / "desktop" / "overlay" / "etc" / "calamares" / "settings.conf").read_text(encoding="utf-8")
     if "- grubcfg" not in cal_settings:
         errors.append("Calamares settings.conf must run 'grubcfg' before 'bootloader'")
+
+    cal_mount = (REPO_ROOT / "desktop" / "overlay" / "etc" / "calamares" / "modules" / "mount.conf").read_text(encoding="utf-8")
+    if "efivarfs" not in cal_mount:
+        errors.append("Calamares mount.conf must configure efivarfs mount for UEFI installs")
+
+    chroot_sh = (REPO_ROOT / "build" / "chroot-setup.sh").read_text(encoding="utf-8")
+    if "security.debian.org" not in chroot_sh:
+        errors.append("build/chroot-setup.sh must configure Debian security updates repository")
+    if "systemd-timesyncd" not in chroot_sh:
+        errors.append("build/chroot-setup.sh must enable systemd-timesyncd for NTP clock sync")
+    if re.search(r"systemctl\s+disable[^\n]*fstrim\.timer", chroot_sh):
+        errors.append("build/chroot-setup.sh must NOT disable fstrim.timer (needed for installed SSD TRIM)")
     return errors
 
 

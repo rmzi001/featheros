@@ -212,15 +212,16 @@ def safe_extract_tarball(archive_path: str | Path, dest_dir: str | Path) -> Path
 
 
 def _verify_sha512(file_path: Path, checksum_text: str) -> None:
+    """Verify file_path against a SHA-512 checksum file (fails closed if missing or mismatched)."""
     expected = ""
     for line in checksum_text.splitlines():
         parts = line.strip().split()
-        if parts and len(parts[0]) == 128:
+        if parts and len(parts[0]) == 128 and all(c in "0123456789abcdefABCDEF" for c in parts[0]):
             if len(parts) == 1 or parts[-1].lstrip("*").endswith(file_path.name):
                 expected = parts[0].lower()
                 break
     if not expected:
-        return
+        raise ValueError(f"No valid SHA-512 checksum found for {file_path.name}")
     h = hashlib.sha512()
     with file_path.open("rb") as fh:
         while chunk := fh.read(1024 * 1024):
@@ -235,8 +236,9 @@ def install_ge_proton(
     home: str | Path | None = None,
     fetcher: Callable[[str], bytes] | None = None,
     downloader: Callable[[str, Path], None] | None = None,
+    sha512_fetcher: Callable[[str], bytes] | None = None,
 ) -> ReleaseAsset:
-    """Download, verify SHA-512 (when available), and safely extract latest GE-Proton."""
+    """Download, verify SHA-512 (fail-closed when published), and safely extract latest GE-Proton."""
     asset = fetch_latest_ge_proton(fetcher=fetcher)
     if not asset.download_url.startswith("https://"):
         raise ValueError(f"Refusing non-HTTPS download URL: {asset.download_url}")
@@ -247,6 +249,10 @@ def install_ge_proton(
         archive_path = Path(tmp) / asset.asset_name
         if downloader is not None:
             downloader(asset.download_url, archive_path)
+            if asset.sha512_url and sha512_fetcher is not None:
+                _verify_sha512(
+                    archive_path, sha512_fetcher(asset.sha512_url).decode("utf-8", errors="ignore")
+                )
         else:
             req = urllib.request.Request(
                 asset.download_url,

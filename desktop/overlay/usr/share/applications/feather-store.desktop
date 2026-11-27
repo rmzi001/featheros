@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=FeatherStore — Welcome & App Hub
-GenericName=App Store
+Name=FeatherStore
+GenericName=App & Gaming Hub
 Comment=One-click installer for Browsers, Steam/Proton Gaming, Productivity & Developer Tools
 Exec=feather-store
 Icon=system-software-install

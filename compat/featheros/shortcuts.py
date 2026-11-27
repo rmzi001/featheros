@@ -210,17 +210,23 @@ def get_applications_dir(override: str | Path | None = None) -> Path:
 
 
 def _quote_desktop_exec_arg(arg: str) -> str:
-    """Quote an Exec= argument per the Freedesktop Desktop Entry specification."""
-    escaped = (
+    """Quote an Exec= argument per the Freedesktop Desktop Entry specification.
+
+    Desktop Entry string unescaping runs before Exec quoting, so backslashes inside
+    double-quoted arguments must be escaped twice (e.g. literal '\\' -> '\\\\\\\\').
+    """
+    exec_escaped = (
         arg.replace("\\", "\\\\")
         .replace('"', '\\"')
         .replace("$", "\\$")
         .replace("`", "\\`")
         .replace("%", "%%")
     )
-    if not escaped or any(ch in arg for ch in ' \t\n"\'\\><~|&;$*?#()`%'):
-        return f'"{escaped}"'
-    return escaped
+    if not arg or any(ch in arg for ch in ' \t\n"\'\\><~|&;$*?#()`%'):
+        # Apply Desktop Entry string-value backslash escaping on top of Exec quoting
+        keyfile_escaped = exec_escaped.replace("\\", "\\\\")
+        return f'"{keyfile_escaped}"'
+    return exec_escaped
 
 
 def render_desktop_entry(shortcut: WindowsShortcut) -> str:
@@ -229,7 +235,12 @@ def render_desktop_entry(shortcut: WindowsShortcut) -> str:
     if shortcut.arguments:
         exec_parts.append("--")
         try:
-            exec_parts.extend(shlex.split(shortcut.arguments, posix=True))
+            # Use posix=False to preserve Windows backslash paths, then strip outer matching quotes
+            raw_tokens = shlex.split(shortcut.arguments, posix=False)
+            for tok in raw_tokens:
+                if len(tok) >= 2 and tok[0] == tok[-1] and tok[0] in ('"', "'"):
+                    tok = tok[1:-1]
+                exec_parts.append(tok)
         except ValueError:
             exec_parts.extend(shortcut.arguments.split())
     exec_line = " ".join(_quote_desktop_exec_arg(part) for part in exec_parts)

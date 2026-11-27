@@ -1,4 +1,4 @@
-"""feather-compat: Lightweight Compatibility Manager GUI for FeatherOS (v0.3.0)."""
+"""feather-compat: Lightweight Compatibility Manager GUI for FeatherOS (v0.5.0)."""
 
 from __future__ import annotations
 
@@ -101,8 +101,10 @@ class CompatController:
     def plan_launch(self, target: str | Path, bottle_slug: str) -> LaunchPlan:
         return self.manager.build_launch_plan(target, bottle_name=bottle_slug, probe=self.probe)
 
-    def launch_binary(self, target: str | Path, bottle_slug: str) -> tuple[LaunchPlan, bool, str]:
-        """Build a launch plan, apply prefix settings if needed, launch, and sync shortcuts."""
+    def launch_binary(
+        self, target: str | Path, bottle_slug: str, *, on_exit: Any = None
+    ) -> tuple[LaunchPlan, bool, str]:
+        """Build a launch plan, prepare prefix/DXVK, launch, sync shortcuts, and report crashes."""
         plan = self.plan_launch(target, bottle_slug)
         if not plan.binary_info.valid:
             return plan, False, f"Invalid binary: {plan.binary_info.error}"
@@ -118,11 +120,29 @@ class CompatController:
         merged.update(plan.env)
 
         def _spawn_and_sync() -> None:
-            if not (plan.prefix_path / "system.reg").is_file():
-                self.manager.apply_bottle_settings(plan.bottle.slug, probe=self.probe)
+            self.manager.prepare_bottle_for_launch(plan, probe=self.probe)
             proc = subprocess.Popen(plan.command, env=merged)
-            proc.wait()
+            rc = proc.wait()
             sync_bottle_shortcuts(self.manager, plan.bottle.slug)
+            if callable(on_exit):
+                on_exit(Path(target).name, rc)
+            elif rc not in (0, 1602):
+                notifier = shutil.which("notify-send")
+                if notifier:
+                    try:
+                        subprocess.Popen(
+                            [
+                                notifier,
+                                "-a",
+                                "FeatherOS Windows Apps",
+                                f"{Path(target).name} exited (code {rc})",
+                                "Try installing Visual C++ / .NET runtimes under Windows Runtimes.",
+                            ],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                        )
+                    except OSError:
+                        pass
 
         threading.Thread(target=_spawn_and_sync, daemon=True).start()
         note = f" ({'; '.join(plan.notices)})" if plan.notices else ""
@@ -388,8 +408,19 @@ def _run_gtk_gui(controller: CompatController) -> int:
                 f"<b>Installed Runners:</b> {escape_pango(', '.join(r['name'] for r in st['runners']))}"
             )
 
+        def _on_app_exit(self, app_name: str, rc: int) -> None:
+            if rc not in (0, 1602):
+                GLib.idle_add(
+                    self.status_bar.set_text,
+                    f"{app_name} exited with code {rc}. Check Windows Runtimes or run 'feather-run --debug'.",
+                )
+            else:
+                GLib.idle_add(self._load_bottle, self.selected_slug)
+
         def _on_launch_discovered(self, _btn: Any, target: str) -> None:
-            _plan, _ok, msg = controller.launch_binary(target, self.selected_slug)
+            _plan, _ok, msg = controller.launch_binary(
+                target, self.selected_slug, on_exit=self._on_app_exit
+            )
             self.status_bar.set_text(msg)
 
         def _on_bottle_selected(self, _box: Any, row: Any) -> None:
@@ -461,7 +492,9 @@ def _run_gtk_gui(controller: CompatController) -> int:
             dialog.add_filter(flt)
             if dialog.run() == Gtk.ResponseType.OK:
                 path = dialog.get_filename()
-                _plan, _ok, msg = controller.launch_binary(path, self.selected_slug)
+                _plan, _ok, msg = controller.launch_binary(
+                    path, self.selected_slug, on_exit=self._on_app_exit
+                )
                 self.status_bar.set_text(msg)
             dialog.destroy()
 

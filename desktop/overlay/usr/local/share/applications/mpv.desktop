@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Media Player
+GenericName=Multimedia Player
+Comment=Play videos, music, and streams with hardware acceleration
+Exec=mpv --player-operation-mode=pseudo-gui -- %U
+Icon=mpv
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Video;Player;TV;
+MimeType=video/mp4;video/x-matroska;video/webm;audio/mpeg;audio/flac;audio/ogg;

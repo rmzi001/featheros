@@ -463,9 +463,14 @@ class BottleManager:
         )
 
     def build_winetricks_command(
-        self, slug: str, verbs: list[str], *, unattended: bool = True
+        self,
+        slug: str,
+        verbs: list[str],
+        *,
+        unattended: bool = True,
+        probe: SystemProbe | None = None,
     ) -> tuple[list[str], dict[str, str]]:
-        """Build a winetricks command and env for installing Windows runtimes."""
+        """Build a winetricks command and env (with custom GE-Proton WINE/WINESERVER support)."""
         cfg = self.get_bottle(slug)
         if not verbs:
             raise ValueError("At least one winetricks verb is required")
@@ -477,6 +482,13 @@ class BottleManager:
             "WINEPREFIX": str(self.prefix_dir(cfg.slug)),
             "WINEARCH": cfg.arch,
         }
+        if cfg.runner and cfg.runner != "system-wine":
+            sys_probe = probe or probe_system()
+            wine_bin, _ = self.resolve_runner_binary(cfg, sys_probe)
+            env["WINE"] = wine_bin
+            ws = Path(wine_bin).parent / "wineserver"
+            if ws.is_file():
+                env["WINESERVER"] = str(ws)
         return cmd, env
 
     def build_apply_settings_commands(
@@ -504,7 +516,13 @@ class BottleManager:
                 "/f",
             ],
         ]
-        if cfg.dxvk and sys_probe.vulkan_hardware_ready and sys_probe.dxvk_available:
+        # Only run Debian's system dxvk-setup on system-wine; GE-Proton ships its own bundled DXVK
+        if (
+            cfg.runner == "system-wine"
+            and cfg.dxvk
+            and sys_probe.vulkan_hardware_ready
+            and sys_probe.dxvk_available
+        ):
             dxvk_setup = shutil.which("dxvk-setup")
             if dxvk_setup:
                 commands.append([dxvk_setup, "install"])
@@ -515,6 +533,29 @@ class BottleManager:
             "WINEDEBUG": "-all",
         }
         return commands, env
+
+    def prepare_bottle_for_launch(
+        self, plan: LaunchPlan, *, probe: SystemProbe | None = None
+    ) -> bool:
+        """Initialize a new bottle prefix or apply DXVK once to a pre-warmed bottle on Vulkan GPUs."""
+        sys_probe = probe or probe_system()
+        is_first_run = not (plan.prefix_path / "system.reg").is_file()
+        dxvk_marker = plan.prefix_path / ".featheros-dxvk-applied"
+        needs_dxvk_install = (
+            plan.bottle.runner == "system-wine"
+            and plan.effective_backend.startswith("dxvk")
+            and shutil.which("dxvk-setup") is not None
+            and not dxvk_marker.is_file()
+        )
+        if not (is_first_run or needs_dxvk_install):
+            return False
+        results = self.apply_bottle_settings(plan.bottle.slug, probe=sys_probe)
+        if needs_dxvk_install and any("dxvk-setup" in c[0] and rc == 0 for c, rc in results):
+            try:
+                dxvk_marker.write_text("installed\n", encoding="utf-8")
+            except OSError:
+                pass
+        return True
 
     def apply_bottle_settings(
         self, slug: str, probe: SystemProbe | None = None

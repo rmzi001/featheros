@@ -61,6 +61,10 @@ list row, listbox row {
     color: #cbd5e1;
 }
 
+list row:hover, listbox row:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
 list row:selected, listbox row:selected {
     background-color: rgba(56, 189, 248, 0.18);
     color: #ffffff;
@@ -125,12 +129,16 @@ button:disabled {
     border-color: rgba(255, 255, 255, 0.05);
 }
 
-entry, combobox button {
+entry, combobox button, spinbutton {
     background-color: #1c2230;
     color: #f8fafc;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
     padding: 6px 10px;
+}
+
+entry placeholder {
+    color: #64748b;
 }
 
 entry:focus {

@@ -286,6 +286,43 @@ class TestBottleManagerAndLaunchPlan(unittest.TestCase):
             self.assertTrue(any("winecfg" in c and "win11" in c for c in cmds))
             self.assertTrue(any("LogPixels" in c and "120" in c for c in cmds))
 
+    def test_gaming_profile_dxvk_setup_and_ge_proton_winetricks(self) -> None:
+        import os
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mgr = BottleManager(home=root / "feather")
+            exe = make_synthetic_pe(root / "dx11game.exe")
+
+            # Global gaming profile automatically wraps launch with gamemoderun
+            xdg_cfg = root / "xdg_cfg"
+            (xdg_cfg / "featheros").mkdir(parents=True)
+            (xdg_cfg / "featheros" / "profile.json").write_text('{"profile": "gaming"}\n', encoding="utf-8")
+            with mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(xdg_cfg)}):
+                plan = mgr.build_launch_plan(exe, bottle_name="default", probe=make_mock_probe(vulkan_hw=True, gamemode=True))
+                self.assertEqual(plan.command[0], "/usr/bin/gamemoderun")
+
+            # system-wine emits `dxvk-setup install` (never `--symlink`)
+            with mock.patch("featheros.bottles.shutil.which", return_value="/usr/bin/dxvk-setup"):
+                sys_cmds, _ = mgr.build_apply_settings_commands("default", probe=make_mock_probe(vulkan_hw=True))
+                self.assertIn(["/usr/bin/dxvk-setup", "install"], sys_cmds)
+                self.assertFalse(any("--symlink" in c for c in sys_cmds))
+
+            # GE-Proton runner sets WINE/WINESERVER for winetricks and skips Debian dxvk-setup
+            proton_bin = root / "feather" / "runners" / "GE-Proton9-25" / "files" / "bin"
+            proton_bin.mkdir(parents=True)
+            (proton_bin / "wine").write_text("#!/bin/sh\n", encoding="utf-8")
+            (proton_bin / "wineserver").write_text("#!/bin/sh\n", encoding="utf-8")
+            mgr.create_bottle("proton-game", runner="GE-Proton9-25", dxvk=True)
+
+            _wcmd, wenv = mgr.build_winetricks_command("proton-game", ["vcrun2022"], probe=make_mock_probe(vulkan_hw=True))
+            self.assertEqual(wenv["WINE"], str(proton_bin / "wine"))
+            self.assertEqual(wenv["WINESERVER"], str(proton_bin / "wineserver"))
+            with mock.patch("featheros.bottles.shutil.which", return_value="/usr/bin/dxvk-setup"):
+                p_cmds, _ = mgr.build_apply_settings_commands("proton-game", probe=make_mock_probe(vulkan_hw=True))
+                self.assertFalse(any("dxvk-setup" in c[0] for c in p_cmds))
+
 
 class TestShortcutsAndLnkParser(unittest.TestCase):
     def test_lnk_parsing_and_desktop_sync_and_prune(self) -> None:
@@ -302,7 +339,7 @@ class TestShortcutsAndLnkParser(unittest.TestCase):
             exe = make_synthetic_pe(app_dir / "NoteApp.exe")
             make_synthetic_pe(app_dir / "unins000.exe")
 
-            # Create Start Menu .lnk pointing to NoteApp.exe with an argument
+            # Create Start Menu .lnk pointing to NoteApp.exe with a Windows path argument
             lnk_path = (
                 drive_c
                 / "ProgramData"
@@ -312,11 +349,11 @@ class TestShortcutsAndLnkParser(unittest.TestCase):
                 / "Programs"
                 / "NoteApp Pro.lnk"
             )
-            make_synthetic_lnk(lnk_path, r"C:\Program Files\NoteApp\NoteApp.exe", "--portable")
+            make_synthetic_lnk(lnk_path, r"C:\Program Files\NoteApp\NoteApp.exe", r'--portable "C:\Data\note.txt"')
 
             target, args = parse_lnk_target(lnk_path)
             self.assertEqual(target, r"C:\Program Files\NoteApp\NoteApp.exe")
-            self.assertEqual(args, "--portable")
+            self.assertEqual(args, r'--portable "C:\Data\note.txt"')
 
             discovered = discover_bottle_shortcuts(mgr, "office")
             self.assertEqual(len(discovered), 1)
@@ -329,6 +366,8 @@ class TestShortcutsAndLnkParser(unittest.TestCase):
             self.assertIn("Name=NoteApp Pro", desktop_text)
             self.assertIn("feather-run", desktop_text)
             self.assertIn("--portable", desktop_text)
+            # Backslashes in Windows paths must be double-escaped per Freedesktop Exec= spec (\\\\)
+            self.assertIn(r"C:\\\\Data\\\\note.txt", desktop_text)
             # Freedesktop Exec= spec requires double quotes, never single quotes around paths with spaces
             exec_line = next(ln for ln in desktop_text.splitlines() if ln.startswith("Exec="))
             self.assertIn('"', exec_line)

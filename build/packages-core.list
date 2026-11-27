@@ -1,11 +1,13 @@
-# FeatherOS v0.4.0 Core Mandatory Packages (installed with --no-install-recommends)
+# FeatherOS v0.5.0 Core Mandatory Packages (installed with --no-install-recommends)
 # Boot, Kernel, Disk Installer & Live System
 linux-image-amd64
 initramfs-tools
 live-boot
 systemd-sysv
+systemd-timesyncd
 sudo
 locales
+whiptail
 dbus
 dbus-x11
 ca-certificates
@@ -31,12 +33,15 @@ calamares
 qml6-module-qtquick
 qml6-module-qtquick-window
 
-# Networking, Audio, Disks & Desktop Security (single Polkit agent: mate-polkit)
+# Networking (Ethernet + WPA2/WPA3 Wi-Fi), Audio (incl. Bluetooth), Disks & Security
 network-manager
 network-manager-gnome
+wpasupplicant
+wireless-regdb
 pipewire
 pipewire-pulse
 pipewire-alsa
+libspa-0.2-bluetooth
 wireplumber
 pavucontrol
 mate-polkit
@@ -67,6 +72,7 @@ thunar
 thunar-volman
 thunar-archive-plugin
 tumbler
+ffmpegthumbnailer
 gvfs
 gvfs-fuse
 xfce4-terminal

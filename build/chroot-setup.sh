@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FeatherOS v0.3.0 chroot provisioning script (runs inside target Debian rootfs)
+# FeatherOS v0.5.0 chroot provisioning script (runs inside target Debian rootfs)
 set -euo pipefail
 
 export DEBIAN_FRONTEND=noninteractive
@@ -9,13 +9,14 @@ BUILD_TMP="/tmp/featheros-build"
 # shellcheck source=../config/featheros.conf
 source "${BUILD_TMP}/featheros.conf"
 
-echo "[FeatherOS chroot] Configuring hostname and apt repositories (${DEBIAN_SUITE})..."
+echo "[FeatherOS chroot] Configuring hostname and apt repositories (${DEBIAN_SUITE} + security)..."
 echo "${LIVE_HOSTNAME}" > /etc/hostname
 mkdir -p /etc/network
 
 cat > /etc/apt/sources.list <<EOF
 deb ${DEBIAN_MIRROR} ${DEBIAN_SUITE} main contrib non-free non-free-firmware
 deb ${DEBIAN_MIRROR} ${DEBIAN_SUITE}-updates main contrib non-free non-free-firmware
+deb http://security.debian.org/debian-security ${DEBIAN_SUITE}-security main contrib non-free non-free-firmware
 EOF
 
 if [ "${ENABLE_MULTIARCH_I386}" = "true" ]; then
@@ -153,11 +154,11 @@ sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen || true
 locale-gen || true
 echo 'LANG=en_US.UTF-8' > /etc/default/locale
 
-systemctl enable lightdm NetworkManager zramswap feather-boot-report || true
+systemctl enable lightdm NetworkManager zramswap systemd-timesyncd feather-boot-report || true
 systemctl enable bluetooth || true
 
-# Disable slow/unneeded background timers & live scrub services for snappier boot
-systemctl disable apt-daily.timer apt-daily-upgrade.timer man-db.timer dpkg-db-backup.timer fstrim.timer e2scrub_all.timer e2scrub_reap.service 2>/dev/null || true
+# Disable slow/unneeded live timers while preserving fstrim.timer for installed SSD health
+systemctl disable apt-daily.timer apt-daily-upgrade.timer man-db.timer dpkg-db-backup.timer e2scrub_all.timer e2scrub_reap.service 2>/dev/null || true
 
 if command -v plymouth-set-default-theme >/dev/null 2>&1; then
   plymouth-set-default-theme featheros || true

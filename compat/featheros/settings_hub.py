@@ -1,4 +1,4 @@
-"""feather-settings: Windows 11-style Unified System Settings Hub for FeatherOS (v0.3.0)."""
+"""feather-settings: Windows 11-style Unified System Settings Hub for FeatherOS (v0.5.0)."""
 
 from __future__ import annotations
 
@@ -312,6 +312,8 @@ class SettingsController:
             item["available"] = (
                 True if action.check_binary is None else self.which(action.check_binary) is not None
             )
+            if action.id == "install-disk" and not item["available"]:
+                continue
             results.append(item)
         return results
 
@@ -443,6 +445,8 @@ def _run_gtk_settings(controller: SettingsController) -> int:
             first_row = self.nav_list.get_row_at_index(0)
             if first_row is not None:
                 self.nav_list.select_row(first_row)
+            # Keep initial focus on sidebar so the 'Find a setting...' search placeholder is visible
+            self.nav_list.grab_focus()
 
         def _on_search_changed(self, _entry: Any) -> None:
             q = self.search_entry.get_text().strip()

@@ -6,30 +6,37 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from featheros.selftest import ESSENTIAL_BINARIES, run_selftest
+from featheros.selftest import ESSENTIAL_BINARIES, REQUIRED_CALAMARES_MODULES, run_selftest
 from tests.test_featherrun_core import make_mock_probe
 
 
 def _build_healthy_root(root: Path) -> None:
     (root / "etc").mkdir(parents=True, exist_ok=True)
-    (root / "etc" / "os-release").write_text('PRETTY_NAME="FeatherOS 0.4.0"\n', encoding="utf-8")
-    (root / "etc" / "issue").write_text("FeatherOS 0.4.0\n", encoding="utf-8")
+    (root / "etc" / "os-release").write_text('PRETTY_NAME="FeatherOS 0.5.0"\n', encoding="utf-8")
+    (root / "etc" / "issue").write_text("FeatherOS 0.5.0\n", encoding="utf-8")
     (root / "boot").mkdir(exist_ok=True)
     (root / "boot" / "vmlinuz-6.12.0-amd64").write_bytes(b"vmlinuz")
 
     files = {
+        "etc/apt/sources.list": "deb http://security.debian.org/debian-security trixie-security main\n",
+        "usr/lib/x86_64-linux-gnu/spa-0.2/bluez5/libspa-bluez5.so": "so\n",
+        "usr/lib/systemd/systemd-timesyncd": "bin\n",
         "usr/share/themes/FeatherWin11-Dark/gtk-3.0/gtk.css": "ok\n",
         "usr/share/themes/FeatherWin11-Dark/xfwm4/themerc": "ok\n",
         "usr/share/themes/FeatherWin11-Light/gtk-3.0/gtk.css": "ok\n",
         "usr/share/themes/FeatherWin11-Light/xfwm4/themerc": "ok\n",
         "etc/xdg/autostart/feather-polkit.desktop": "[Desktop Entry]\nName=Polkit\nExec=/usr/local/bin/feather-polkit-agent\n",
-        "usr/lib/x86_64-linux-gnu/polkit-mate-authentication-agent-1": "bin\n",
+        "usr/libexec/polkit-mate-authentication-agent-1": "bin\n",
         "etc/calamares/branding/featheros/show.qml": "Presentation {}\n",
-        "etc/calamares/modules/removeuser.conf": "username: feather\n",
-        "etc/calamares/modules/users.conf": "sudoersGroup: sudo\n",
-        "etc/calamares/modules/packages.conf": "operations:\n  - try_remove:\n      - live-boot\n",
         "etc/default/grub": 'GRUB_DISTRIBUTOR="FeatherOS"\n',
     }
+    for mod in REQUIRED_CALAMARES_MODULES:
+        files[f"etc/calamares/modules/{mod}"] = "# ok\n"
+    files["etc/calamares/modules/mount.conf"] = "extraMounts:\n  - device: efivarfs\n"
+    files["etc/calamares/modules/removeuser.conf"] = "username: feather\n"
+    files["etc/calamares/modules/users.conf"] = "sudoersGroup: sudo\n"
+    files["etc/calamares/modules/packages.conf"] = "operations:\n  - try_remove:\n      - live-boot\n"
+
     for rel, content in files.items():
         p = root / rel
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -54,6 +61,8 @@ class TestFeatherSelftest(unittest.TestCase):
                     return 0, "/dev/zram0 partition 1G 0B 100"
                 if "FEATHEROS_WIN32_OK" in cmd:
                     return 0, "FEATHEROS_WIN32_OK"
+                if "--version" in cmd:
+                    return 0, "feather-run 0.5.0"
                 return 0, ""
 
             probe = make_mock_probe(vulkan_hw=True)
@@ -105,6 +114,23 @@ class TestFeatherSelftest(unittest.TestCase):
             self.assertFalse(checks["calamares_ready"]["passed"])
             self.assertFalse(checks["no_legacy_debt"]["passed"])
             self.assertLess(report["score"], 50)
+
+    def test_detects_missing_security_repo_and_mount_conf(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _build_healthy_root(root)
+            (root / "etc" / "apt" / "sources.list").write_text("deb http://deb.debian.org/debian trixie main\n", encoding="utf-8")
+            (root / "etc" / "calamares" / "modules" / "mount.conf").unlink()
+            report = run_selftest(
+                run_cmd=lambda _c, _t: (0, ""),
+                which=lambda n: f"/usr/bin/{n}" if n in ESSENTIAL_BINARIES else None,
+                root=root,
+                probe=make_mock_probe(vulkan_hw=True),
+                run_wine_smoke=False,
+            )
+            checks = {c["id"]: c for c in report["checks"]}
+            self.assertFalse(checks["hardware_security"]["passed"])
+            self.assertFalse(checks["calamares_ready"]["passed"])
 
 
 if __name__ == "__main__":

@@ -36,6 +36,7 @@ ESSENTIAL_BINARIES: tuple[str, ...] = (
     "mousepad",
     "ristretto",
     "firefox-esr",
+    "wpa_supplicant",
     "wine",
     "grub-install",
     "efibootmgr",
@@ -48,6 +49,27 @@ ESSENTIAL_BINARIES: tuple[str, ...] = (
     "feather-settings",
     "feather-store",
     "feather-ctl",
+)
+
+REQUIRED_CALAMARES_MODULES: tuple[str, ...] = (
+    "welcome.conf",
+    "locale.conf",
+    "keyboard.conf",
+    "partition.conf",
+    "mount.conf",
+    "unpackfs.conf",
+    "machineid.conf",
+    "fstab.conf",
+    "users.conf",
+    "removeuser.conf",
+    "displaymanager.conf",
+    "packages.conf",
+    "shellprocess.conf",
+    "initramfs.conf",
+    "grubcfg.conf",
+    "bootloader.conf",
+    "umount.conf",
+    "finished.conf",
 )
 
 
@@ -124,10 +146,10 @@ def _count_enabled_polkit_autostarts(root: Path) -> list[str]:
         low = text.lower()
         if not any(tok in low for tok in ("polkit", "lxpolkit")):
             continue
-        if "hidden=true" in low or "nodisplay=true" in low and "exec=" not in low:
+        lines = [ln.strip().lower() for ln in text.splitlines()]
+        if "hidden=true" in lines:
             continue
-        # Respect explicit Hidden=true in .desktop
-        if any(ln.strip().lower() == "hidden=true" for ln in text.splitlines()):
+        if "nodisplay=true" in lines and not any(ln.startswith("exec=") for ln in lines):
             continue
         active.append(df.name)
     return active
@@ -145,7 +167,7 @@ def run_selftest(
     sys_probe = probe or probe_system(which=which)
     checks: list[CheckResult] = []
 
-    # 1. OS Identity (8 pts)
+    # 1. OS Identity (6 pts)
     os_release = root / "etc" / "os-release"
     issue_file = root / "etc" / "issue"
     rel_text = os_release.read_text(encoding="utf-8", errors="ignore") if os_release.is_file() else ""
@@ -156,7 +178,7 @@ def run_selftest(
             id="os_identity",
             category="branding",
             passed=id_ok,
-            weight=8,
+            weight=6,
             detail="FeatherOS branding present in /etc/os-release and /etc/issue"
             if id_ok
             else "Missing FeatherOS branding in /etc/os-release or /etc/issue",
@@ -205,7 +227,7 @@ def run_selftest(
         ram_detail = "Unable to read /proc/meminfo"
     checks.append(CheckResult("ram_footprint", "performance", ram_ok, 10, ram_detail))
 
-    # 5. Desktop & installer binaries completeness (14 pts)
+    # 5. Desktop, networking & installer binaries completeness (12 pts)
     missing_bins = [b for b in ESSENTIAL_BINARIES if _find_binary(b, which, root) is None]
     bins_ok = len(missing_bins) == 0
     checks.append(
@@ -213,10 +235,32 @@ def run_selftest(
             id="essential_apps",
             category="completeness",
             passed=bins_ok,
-            weight=14,
-            detail=f"All {len(ESSENTIAL_BINARIES)} core OS, desktop & installer binaries present"
+            weight=12,
+            detail=f"All {len(ESSENTIAL_BINARIES)} core OS, Wi-Fi, desktop & installer binaries present"
             if bins_ok
             else f"Missing binaries: {', '.join(missing_bins)}",
+        )
+    )
+
+    # 5b. Hardware services & Debian security repository readiness (6 pts)
+    sources_list = root / "etc" / "apt" / "sources.list"
+    sources_text = sources_list.read_text(encoding="utf-8", errors="ignore") if sources_list.is_file() else ""
+    has_security_repo = "-security" in sources_text
+    has_bt_audio = (root / "usr" / "lib" / "x86_64-linux-gnu" / "spa-0.2" / "bluez5" / "libspa-bluez5.so").is_file()
+    has_ntp = (root / "usr" / "lib" / "systemd" / "systemd-timesyncd").is_file()
+    hw_sec_ok = has_security_repo and has_bt_audio and has_ntp
+    checks.append(
+        CheckResult(
+            id="hardware_security",
+            category="security",
+            passed=hw_sec_ok,
+            weight=6,
+            detail="Debian -security repo, PipeWire Bluetooth audio (bluez5 SPA) & NTP timesyncd present"
+            if hw_sec_ok
+            else (
+                f"Missing bare-metal essentials: security_repo={has_security_repo}, "
+                f"bt_audio_spa={has_bt_audio}, ntp_timesyncd={has_ntp}"
+            ),
         )
     )
 
@@ -267,49 +311,68 @@ def run_selftest(
     boot_dir = root / "boot"
     has_kernel = boot_dir.is_dir() and any(boot_dir.glob("vmlinuz-*"))
     has_qml = (root / "etc" / "calamares" / "branding" / "featheros" / "show.qml").is_file()
-    has_cleanup = (root / "etc" / "calamares" / "modules" / "removeuser.conf").is_file()
-    users_conf = root / "etc" / "calamares" / "modules" / "users.conf"
+    cal_mod_dir = root / "etc" / "calamares" / "modules"
+    missing_cal_mods = [m for m in REQUIRED_CALAMARES_MODULES if not (cal_mod_dir / m).is_file()]
+    mount_conf = cal_mod_dir / "mount.conf"
+    mount_ok = mount_conf.is_file() and "efivarfs" in mount_conf.read_text(encoding="utf-8", errors="ignore")
+    users_conf = cal_mod_dir / "users.conf"
     has_users = users_conf.is_file() and "sudoersGroup: sudo" in users_conf.read_text(encoding="utf-8", errors="ignore")
-    pkgs_conf = root / "etc" / "calamares" / "modules" / "packages.conf"
+    pkgs_conf = cal_mod_dir / "packages.conf"
     pkgs_safe = pkgs_conf.is_file() and "try_remove:" in pkgs_conf.read_text(encoding="utf-8", errors="ignore")
     has_grub_def = (root / "etc" / "default" / "grub").is_file()
     cal_bins = all(_find_binary(b, which, root) is not None for b in ("calamares", "unsquashfs", "rsync", "grub-install"))
-    cal_ok = has_kernel and has_qml and has_cleanup and has_users and pkgs_safe and has_grub_def and cal_bins
+    cal_ok = (
+        has_kernel
+        and has_qml
+        and len(missing_cal_mods) == 0
+        and mount_ok
+        and has_users
+        and pkgs_safe
+        and has_grub_def
+        and cal_bins
+    )
     checks.append(
         CheckResult(
             id="calamares_ready",
             category="installer",
             passed=cal_ok,
             weight=10,
-            detail="Kernel in /boot, unsquashfs, rsync, grub-install, /etc/default/grub, users.conf, try_remove & QML ready"
+            detail=f"Kernel in /boot, all {len(REQUIRED_CALAMARES_MODULES)} Calamares module configs (incl. efivarfs mount), bins & QML ready"
             if cal_ok
             else (
-                f"Incomplete installer: kernel={has_kernel}, qml={has_qml}, cleanup={has_cleanup}, "
-                f"users={has_users}, try_remove={pkgs_safe}, default_grub={has_grub_def}, bins={cal_bins}"
+                f"Incomplete installer: kernel={has_kernel}, qml={has_qml}, mount_efi={mount_ok}, "
+                f"missing_modules={missing_cal_mods}, users={has_users}, try_remove={pkgs_safe}, "
+                f"default_grub={has_grub_def}, bins={cal_bins}"
             ),
         )
     )
 
-    # 9. Wine + 32-bit i386 multiarch readiness (10 pts)
+    # 9. Wine + 32-bit i386 multiarch readiness (8 pts)
     wine_ok = sys_probe.can_run_wine and sys_probe.multiarch_i386
     checks.append(
         CheckResult(
             id="wine_multiarch",
             category="windows_compat",
             passed=wine_ok,
-            weight=10,
+            weight=8,
             detail=f"Wine={sys_probe.wine_path or sys_probe.wine64_path}, i386={sys_probe.multiarch_i386}"
             if wine_ok
             else f"Missing Wine or i386 multiarch (wine={sys_probe.can_run_wine}, i386={sys_probe.multiarch_i386})",
         )
     )
 
-    # 10. Live Win32 execution smoke test via Wine cmd.exe (10 pts)
+    # 10. Live Win32 execution smoke test via Wine cmd.exe + feather-run CLI sanity (10 pts)
     if run_wine_smoke and sys_probe.can_run_wine:
         wine_bin = sys_probe.wine_path or sys_probe.wine64_path or "wine"
         rc, out = run_cmd([wine_bin, "cmd", "/c", "echo", "FEATHEROS_WIN32_OK"], 45)
-        win32_ok = rc == 0 and "FEATHEROS_WIN32_OK" in out
-        win32_detail = "Win32 cmd.exe returned FEATHEROS_WIN32_OK" if win32_ok else f"rc={rc}: {out[:400]}"
+        fr_bin = _find_binary("feather-run", which, root)
+        fr_rc, fr_out = run_cmd([fr_bin, "--version"], 10) if fr_bin else (127, "feather-run missing")
+        win32_ok = rc == 0 and "FEATHEROS_WIN32_OK" in out and fr_rc == 0
+        win32_detail = (
+            f"Win32 cmd.exe returned FEATHEROS_WIN32_OK & {fr_out or 'feather-run OK'}"
+            if win32_ok
+            else f"wine(rc={rc}): {out[:200]} | feather-run(rc={fr_rc}): {fr_out[:120]}"
+        )
     elif not run_wine_smoke:
         win32_ok = sys_probe.can_run_wine
         win32_detail = "Skipped live Wine exec (--quick); Wine binary detected"

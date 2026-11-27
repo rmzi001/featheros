@@ -1,4 +1,4 @@
-"""Unit tests for FeatherOS Windows-style Unified Settings Hub (v0.4.0)."""
+"""Unit tests for FeatherOS Windows-style Unified Settings Hub (v0.5.0)."""
 
 from __future__ import annotations
 
@@ -41,6 +41,10 @@ class TestFeatherSettingsHub(unittest.TestCase):
             ok_missing, msg_missing = ctrl.run_action("power")
             self.assertFalse(ok_missing)
             self.assertIn("preview mode", msg_missing)
+
+            # Live-only 'install-disk' action must be hidden from search when feather-calamares is absent
+            install_search = ctrl.list_actions(query="Install")
+            self.assertFalse(any(i["id"] == "install-disk" for i in install_search))
 
     def test_cli_list_and_dry_run_open(self) -> None:
         buf = io.StringIO()

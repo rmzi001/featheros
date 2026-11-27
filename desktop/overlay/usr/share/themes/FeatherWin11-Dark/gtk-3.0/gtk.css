@@ -143,6 +143,11 @@ menu menuitem:hover {
     color: #f8fafc;
 }
 
+/* Left balance spacer so centered Windows 11 taskbar pins align cleanly at X=50% */
+.xfce4-panel #separator-18 {
+    min-width: 210px;
+}
+
 /* Windows 11 subtle edge Show Desktop sliver */
 .xfce4-panel #showdesktop-button, .xfce4-panel button.showdesktop {
     min-width: 10px;

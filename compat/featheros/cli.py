@@ -236,28 +236,17 @@ def _cmd_run(args: argparse.Namespace, manager: BottleManager) -> int:
         return 127
 
     is_first_run = not (plan.prefix_path / "system.reg").is_file()
-    dxvk_marker = plan.prefix_path / ".featheros-dxvk-applied"
-    needs_dxvk_install = (
-        plan.effective_backend.startswith("dxvk")
-        and shutil.which("dxvk-setup") is not None
-        and not dxvk_marker.is_file()
-    )
-    if is_first_run or needs_dxvk_install:
+    if is_first_run:
         _notify_desktop(
             "Preparing Windows Environment",
             f"Configuring bottle '{plan.bottle.name}' ({plan.bottle.windows_version})...",
         )
-        results = manager.apply_bottle_settings(plan.bottle.slug, probe=probe)
-        if needs_dxvk_install and any("dxvk-setup" in c[0] and rc == 0 for c, rc in results):
-            try:
-                dxvk_marker.write_text("installed\n", encoding="utf-8")
-            except OSError:
-                pass
     elif _is_gui_session():
         _notify_desktop(
             "Launching Windows App",
             f"Starting {Path(args.target).name} in bottle '{plan.bottle.name}'...",
         )
+    manager.prepare_bottle_for_launch(plan, probe=probe)
 
     manager.touch_last_used(plan.bottle.slug)
     merged_env = os.environ.copy()
@@ -268,7 +257,8 @@ def _cmd_run(args: argparse.Namespace, manager: BottleManager) -> int:
     if not args.no_sync:
         sync_bottle_shortcuts(manager, plan.bottle.slug)
 
-    if proc.returncode != 0 and _is_gui_session():
+    # Exit code 1602 = ERROR_INSTALL_USEREXIT (user clicked Cancel in MSI wizard)
+    if proc.returncode not in (0, 1602) and _is_gui_session():
         _show_gui_error(
             f"{Path(args.target).name} exited unexpectedly",
             f"Exit code {proc.returncode} in bottle '{plan.bottle.name}'.\n"

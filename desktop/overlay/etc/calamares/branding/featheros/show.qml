@@ -22,7 +22,7 @@ Presentation {
                 width: parent.width * 0.8
 
                 Text {
-                    text: "Welcome to FeatherOS 0.4.0"
+                    text: "Welcome to FeatherOS 0.5.0"
                     color: "#f8fafc"
                     font.pixelSize: 28
                     font.bold: true
