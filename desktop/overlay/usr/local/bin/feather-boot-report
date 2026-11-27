@@ -16,10 +16,12 @@ if command -v feather-selftest >/dev/null 2>&1; then
       export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
       export WINEDEBUG="-all"
       export WINEDLLOVERRIDES="mscoree,mshtml="
-      TMP_PREFIX="$(mktemp -d /tmp/feather-selftest-wine.XXXXXX)"
+      DEFAULT_PREFIX="$HOME/.local/share/featheros/bottles/default/prefix"
+      if [ -d "$DEFAULT_PREFIX" ]; then
+        export WINEPREFIX="$DEFAULT_PREFIX"
+      fi
       TMP_RT="$(mktemp -d /tmp/feather-selftest-rt.XXXXXX)"
       chmod 0700 "$TMP_RT"
-      export WINEPREFIX="$TMP_PREFIX"
       if [ -d "/run/user/'"$FEATHER_UID"'" ]; then
         export XDG_RUNTIME_DIR="/run/user/'"$FEATHER_UID"'"
       else
@@ -32,16 +34,14 @@ if command -v feather-selftest >/dev/null 2>&1; then
         unset DISPLAY
       fi
       feather-selftest
-      rm -rf "$TMP_PREFIX" "$TMP_RT" 2>/dev/null || true
+      rm -rf "$TMP_RT" 2>/dev/null || true
     ' > "$REPORT_TXT" 2>&1 || true
   else
-    TMP_HOME="/tmp/feather-selftest-home"
-    TMP_PREFIX="/tmp/feather-selftest-wine"
     TMP_RUNTIME="/tmp/feather-selftest-runtime"
-    mkdir -p "$TMP_HOME" "$TMP_RUNTIME"
+    mkdir -p "$TMP_RUNTIME"
     chmod 0700 "$TMP_RUNTIME"
-    env -u DISPLAY HOME="$TMP_HOME" WINEPREFIX="$TMP_PREFIX" XDG_RUNTIME_DIR="$TMP_RUNTIME" WINEDEBUG="-all" WINEDLLOVERRIDES="mscoree,mshtml=" feather-selftest > "$REPORT_TXT" 2>&1 || true
-    rm -rf "$TMP_HOME" "$TMP_PREFIX" "$TMP_RUNTIME" 2>/dev/null || true
+    env -u DISPLAY XDG_RUNTIME_DIR="$TMP_RUNTIME" WINEDEBUG="-all" WINEDLLOVERRIDES="mscoree,mshtml=" feather-selftest > "$REPORT_TXT" 2>&1 || true
+    rm -rf "$TMP_RUNTIME" 2>/dev/null || true
   fi
 
   if [ -w /dev/ttyS0 ]; then
