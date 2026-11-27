@@ -157,14 +157,20 @@ menu menuitem:hover {
 }
 
 /* Transparent Windows 11-style desktop icon labels (no solid dark boxes or truncation) */
-XfdesktopIconView.view {
+XfdesktopIconView.view,
+XfdesktopIconView.view:backdrop,
+XfdesktopIconView.view.label,
+XfdesktopIconView.view.label:backdrop {
     background-color: transparent;
     color: #f8fafc;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.90);
     -XfdesktopIconView-ellipsize-icon-labels: 0;
 }
 
-XfdesktopIconView.view:active, XfdesktopIconView.view:selected {
+XfdesktopIconView.view:active,
+XfdesktopIconView.view:selected,
+XfdesktopIconView.view.label:active,
+XfdesktopIconView.view.label:selected {
     background-color: rgba(56, 189, 248, 0.26);
     color: #ffffff;
     border-radius: 6px;
