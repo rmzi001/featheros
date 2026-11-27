@@ -117,27 +117,33 @@ chmod 0440 "/etc/sudoers.d/90-${LIVE_USER}"
 cp -a /etc/skel/. "/home/${LIVE_USER}/"
 chown -R "${LIVE_USER}:${LIVE_USER}" "/home/${LIVE_USER}"
 
-echo "[FeatherOS chroot] Smoke-testing live Wine Win32 cmd.exe execution as '${LIVE_USER}'..."
+echo "[FeatherOS chroot] Pre-initializing default Windows bottle & smoke-testing Win32 execution as '${LIVE_USER}'..."
 su -s /bin/bash "${LIVE_USER}" -c '
   set -euo pipefail
-  TMP_W="$(mktemp -d)"
   TMP_R="$(mktemp -d)"
   chmod 0700 "$TMP_R"
-  trap "rm -rf \"$TMP_W\" \"$TMP_R\"" EXIT
-  export WINEPREFIX="$TMP_W"
+  trap "rm -rf \"$TMP_R\"" EXIT
   export XDG_RUNTIME_DIR="$TMP_R"
   export WINEDLLOVERRIDES="mscoree,mshtml="
   export WINEDEBUG="-all"
   unset DISPLAY
+  feather-run bottles create default --windows-version win10 >/dev/null
+  export WINEPREFIX="$HOME/.local/share/featheros/bottles/default/prefix"
   OUT="$(wine cmd /c echo FEATHEROS_WIN32_OK 2>&1 || true)"
+  wineserver -w || true
   echo "[FeatherOS chroot] Wine smoke output: ${OUT}"
   if ! printf "%s\n" "${OUT}" | grep -q "FEATHEROS_WIN32_OK"; then
     echo "[FeatherOS chroot] Wine smoke failed; collecting diagnostics..." >&2
     WINEDEBUG="err+all" wine cmd /c echo FEATHEROS_WIN32_OK || true
-    ls -la /usr/lib/wine /usr/lib/x86_64-linux-gnu/wine /usr/lib/i386-linux-gnu/wine 2>/dev/null || true
     exit 1
   fi
 '
+
+# Mirror the pre-warmed bottle into /etc/skel (deduplicated by mksquashfs) so disk installs launch .exe instantly too
+mkdir -p /etc/skel/.local/share/featheros/bottles
+cp -a "/home/${LIVE_USER}/.local/share/featheros/bottles/default" /etc/skel/.local/share/featheros/bottles/default
+rm -rf "/etc/skel/.local/share/featheros/bottles/default/prefix/drive_c/users/${LIVE_USER}"
+chown -R root:root /etc/skel/.local/share/featheros
 
 echo "[FeatherOS chroot] Configuring locales, fast-boot services, Plymouth, icons & MIME database..."
 sed -i 's/^# *en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen || true
