@@ -3,7 +3,7 @@
     Boot the FeatherOS Live ISO inside QEMU on Windows.
 .EXAMPLE
     .\scripts\run-qemu.ps1
-    .\scripts\run-qemu.ps1 -IsoPath .\dist\featheros-0.3.0-amd64.iso -RamMB 4096 -Cpus 4
+    .\scripts\run-qemu.ps1 -IsoPath .\dist\featheros-0.4.0-amd64.iso -RamMB 4096 -Cpus 4
 #>
 param(
     [string]$IsoPath = "",
@@ -18,7 +18,7 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 
 if (-not $IsoPath) {
-    $IsoPath = Join-Path $RepoRoot "dist\featheros-0.3.0-amd64.iso"
+    $IsoPath = Join-Path $RepoRoot "dist\featheros-0.4.0-amd64.iso"
     if (-not (Test-Path $IsoPath)) {
         $Latest = Get-ChildItem (Join-Path $RepoRoot "dist\featheros-*.iso") -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         if ($Latest) { $IsoPath = $Latest.FullName }

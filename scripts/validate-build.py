@@ -52,17 +52,28 @@ REQUIRED_REPO_FILES = [
     "desktop/overlay/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-panel.xml",
     "desktop/overlay/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfwm4.xml",
     "desktop/overlay/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/xfce4-session.xml",
+    "desktop/overlay/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml/thunar.xml",
     "desktop/overlay/etc/xdg/menus/applications-merged/feather-windows.menu",
     "desktop/overlay/etc/xdg/autostart/feather-polkit.desktop",
     "desktop/overlay/etc/xdg/autostart/feather-clipman.desktop",
+    "desktop/overlay/etc/lightdm/lightdm.conf.d/40-featheros-session.conf",
+    "desktop/overlay/etc/lightdm/lightdm.conf.d/50-featheros-live-autologin.conf",
+    "desktop/overlay/etc/polkit-1/rules.d/49-featheros-live.rules",
+    "desktop/overlay/etc/default/grub",
+    "desktop/overlay/etc/udev/rules.d/80-hide-floppy.rules",
     "desktop/overlay/usr/local/bin/feather-firstboot",
     "desktop/overlay/usr/local/bin/feather-polkit-agent",
     "desktop/overlay/usr/local/bin/feather-calamares",
     "desktop/overlay/usr/local/bin/feather-boot-report",
+    "desktop/overlay/usr/local/share/applications/thunar.desktop",
+    "desktop/overlay/usr/local/share/applications/xfce4-terminal.desktop",
+    "desktop/overlay/usr/local/share/applications/org.xfce.mousepad.desktop",
+    "desktop/overlay/usr/local/share/applications/org.xfce.ristretto.desktop",
     "desktop/overlay/etc/systemd/system/feather-boot-report.service",
     "desktop/overlay/etc/calamares/settings.conf",
     "desktop/overlay/etc/calamares/modules/unpackfs.conf",
     "desktop/overlay/etc/calamares/modules/bootloader.conf",
+    "desktop/overlay/etc/calamares/modules/users.conf",
     "desktop/overlay/etc/calamares/modules/removeuser.conf",
     "desktop/overlay/etc/calamares/modules/packages.conf",
     "desktop/overlay/etc/calamares/modules/shellprocess.conf",
@@ -78,6 +89,7 @@ FORBIDDEN_LEGACY_PATHS = [
     "desktop/overlay/etc/skel/.config/pcmanfm",
     "desktop/overlay/usr/share/themes/FeatherDark",
     "desktop/overlay/usr/share/file-manager",
+    "desktop/overlay/etc/lightdm/lightdm.conf.d/50-featheros.conf",
 ]
 
 PKG_TOKEN_RE = re.compile(r"^[a-z0-9][a-z0-9+.\-]+(:[a-z0-9]+)?$")
@@ -90,7 +102,7 @@ def check_required_files() -> list[str]:
             errors.append(f"Missing required project file: {rel}")
     for rel in FORBIDDEN_LEGACY_PATHS:
         if (REPO_ROOT / rel).exists():
-            errors.append(f"Obsolete v0.1 legacy overlay path still exists: {rel}")
+            errors.append(f"Obsolete legacy overlay path still exists: {rel}")
     return errors
 
 
@@ -126,7 +138,9 @@ def check_package_lists() -> list[str]:
             if list_name == "packages-core.list":
                 seen_core.add(line)
 
-    # Critical packages sanity check (must be in core so Live ISO & Calamares never miss them)
+    if "lxpolkit" in seen_all:
+        errors.append("lxpolkit must NOT be installed alongside mate-polkit (causes duplicate Polkit error popup)")
+
     for must_have in (
         "linux-image-amd64",
         "live-boot",
@@ -134,7 +148,15 @@ def check_package_lists() -> list[str]:
         "grub-efi-amd64-bin",
         "efibootmgr",
         "ntfs-3g",
+        "squashfs-tools",
+        "rsync",
+        "calamares",
+        "qml6-module-qtquick",
+        "qml6-module-qtquick-window",
+        "plymouth-label",
         "mate-polkit",
+        "firefox-esr",
+        "xfce4-power-manager-plugins",
         "xfwm4",
         "xfce4-panel",
         "thunar",
@@ -203,6 +225,18 @@ def check_version_and_build_safety() -> list[str]:
     build_iso = (REPO_ROOT / "build" / "build-iso.sh").read_text(encoding="utf-8")
     if re.search(r"mksquashfs[\s\S]{0,200}-e\s+boot(?:\s|\\|$)", build_iso):
         errors.append("build/build-iso.sh must NOT pass '-e boot' to mksquashfs (breaks Calamares installs)")
+
+    cal_pkgs = (REPO_ROOT / "desktop" / "overlay" / "etc" / "calamares" / "modules" / "packages.conf").read_text(encoding="utf-8")
+    if "try_remove:" not in cal_pkgs:
+        errors.append("Calamares packages.conf must use 'try_remove:' (not fatal 'remove:')")
+
+    cal_users = (REPO_ROOT / "desktop" / "overlay" / "etc" / "calamares" / "modules" / "users.conf").read_text(encoding="utf-8")
+    if "sudoersGroup: sudo" not in cal_users:
+        errors.append("Calamares users.conf must set 'sudoersGroup: sudo'")
+
+    cal_settings = (REPO_ROOT / "desktop" / "overlay" / "etc" / "calamares" / "settings.conf").read_text(encoding="utf-8")
+    if "- grubcfg" not in cal_settings:
+        errors.append("Calamares settings.conf must run 'grubcfg' before 'bootloader'")
     return errors
 
 
@@ -223,9 +257,9 @@ def main() -> int:
     print("FeatherOS build validation PASSED:")
     print(f"  - Required project files verified ({len(REQUIRED_REPO_FILES)} files, 0 legacy paths)")
     print("  - Linux build, overlay, and CI scripts use strict LF line endings")
-    print("  - Debian core & optional package lists validated (XFCE 4.20 + Wine/i386 + GRUB2 + Polkit)")
+    print("  - Debian core & optional package lists validated (XFCE 4.20 + Wine/i386 + Calamares/Qt6 + GRUB2 + single Polkit)")
     print("  - XML, SVG, .menu, and .desktop overlay definitions validated")
-    print("  - Version consistency and Calamares /boot preservation verified")
+    print("  - Version consistency and Calamares boot/sudo/try_remove safety verified")
     return 0
 
 

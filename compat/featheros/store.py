@@ -13,7 +13,7 @@ import sys
 import threading
 from typing import Any, Callable, Sequence
 
-from . import __codename__, __version__
+from . import __codename__, __codename_display__, __version__
 from .ctl import collect_system_status, get_config_dir
 from .fluent_theme import apply_fluent_gtk_theme, escape_pango
 from .runners import install_ge_proton, list_installed_runners
@@ -32,6 +32,7 @@ class StoreApp:
     packages: tuple[str, ...]
     check_binaries: tuple[str, ...]
     size_hint: str
+    require_all_binaries: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -58,6 +59,16 @@ CATALOG: tuple[StoreApp, ...] = (
         packages=("chromium",),
         check_binaries=("chromium", "chromium-browser"),
         size_hint="~310 MB",
+    ),
+    StoreApp(
+        id="falkon",
+        name="Falkon Lightweight Browser",
+        category="browsers",
+        summary="Ultra-fast low-RAM web browser with built-in ad blocker for 2-4 GB PCs.",
+        install_kind="apt",
+        packages=("falkon",),
+        check_binaries=("falkon",),
+        size_hint="~85 MB",
     ),
     # Gaming & Windows Compatibility
     StoreApp(
@@ -99,6 +110,7 @@ CATALOG: tuple[StoreApp, ...] = (
         packages=("gamemode", "mangohud"),
         check_binaries=("gamemoderun", "mangohud"),
         size_hint="~25 MB",
+        require_all_binaries=True,
     ),
     # Productivity
     StoreApp(
@@ -141,6 +153,7 @@ CATALOG: tuple[StoreApp, ...] = (
         packages=("git", "build-essential", "python3-venv", "python3-pip", "ripgrep"),
         check_binaries=("git", "gcc", "rg"),
         size_hint="~280 MB",
+        require_all_binaries=True,
     ),
     StoreApp(
         id="nodejs",
@@ -151,6 +164,7 @@ CATALOG: tuple[StoreApp, ...] = (
         packages=("nodejs", "npm"),
         check_binaries=("node", "npm"),
         size_hint="~110 MB",
+        require_all_binaries=True,
     ),
 )
 
@@ -233,10 +247,12 @@ class StoreController:
             return any(r.kind == "ge-proton" for r in runners)
         if not app.check_binaries:
             return False
+        if app.require_all_binaries:
+            return all(self.which(binary) is not None for binary in app.check_binaries)
         return any(self.which(binary) is not None for binary in app.check_binaries)
 
     def has_calamares_installer(self) -> bool:
-        return self.which("calamares") is not None or self.which("feather-calamares") is not None
+        return self.which("calamares") is not None
 
     def build_install_plan(self, app_id: str) -> InstallPlan:
         app = self.get_app(app_id)
@@ -257,10 +273,8 @@ class StoreController:
         term = self.which("xfce4-terminal")
         pkgs_str = " ".join(shlex.quote(p) for p in app.packages)
 
-        # Always run `apt-get update` first so fresh Live ISO boots with cleaned apt lists succeed!
-        inner_bash = (
-            f"apt-get update && apt-get install -y --no-install-recommends {pkgs_str}"
-        )
+        # Always run `apt-get update` first and allow recommended UI/runtime deps for desktop apps
+        inner_bash = f"apt-get update && apt-get install -y {pkgs_str}"
         elevate = [pkexec] if pkexec else ([sudo] if sudo else [])
         if term:
             elev_prefix = " ".join(shlex.quote(x) for x in elevate)
@@ -332,7 +346,7 @@ def _run_gtk_store(controller: StoreController) -> int:
             title = Gtk.Label(xalign=0)
             title.get_style_context().add_class("feather-title")
             title.set_markup(
-                f"<b><big>Welcome to FeatherOS</big></b>  <small>v{__version__} ({__codename__})</small>\n"
+                f"<b><big>Welcome to FeatherOS</big></b>  <small>v{escape_pango(__version__)} ({escape_pango(__codename_display__)})</small>\n"
                 "<small>Modern lightweight Windows-compatible OS with built-in .exe/.msi support.</small>"
             )
             root.pack_start(title, False, False, 0)
@@ -356,13 +370,18 @@ def _run_gtk_store(controller: StoreController) -> int:
                 btn_install = Gtk.Button(label="Install FeatherOS to Disk")
                 btn_install.connect("clicked", lambda _b: subprocess.Popen(cal_cmd))
                 quick.pack_start(btn_install, False, False, 0)
+
+            btn_refresh = Gtk.Button(label="Refresh")
+            btn_refresh.connect("clicked", lambda _b: self._rebuild_tabs())
+            quick.pack_end(btn_refresh, False, False, 0)
             root.pack_start(quick, False, False, 0)
 
             self.notebook = Gtk.Notebook()
             root.pack_start(self.notebook, True, True, 0)
 
             footer = Gtk.Box(spacing=12)
-            self.status_lbl = Gtk.Label(label="Choose an app to install.", xalign=0)
+            live_hint = "  •  Live login: feather / feather" if Path("/run/live/medium").is_dir() else ""
+            self.status_lbl = Gtk.Label(label=f"Choose an app to install.{live_hint}", xalign=0)
             self.status_lbl.get_style_context().add_class("feather-subtitle")
             footer.pack_start(self.status_lbl, True, True, 0)
 
@@ -376,6 +395,15 @@ def _run_gtk_store(controller: StoreController) -> int:
             root.pack_start(footer, False, False, 0)
 
             self._build_tabs()
+
+        def _rebuild_tabs(self) -> None:
+            cur = self.notebook.get_current_page()
+            while self.notebook.get_n_pages() > 0:
+                self.notebook.remove_page(0)
+            self._build_tabs()
+            self.notebook.show_all()
+            if 0 <= cur < self.notebook.get_n_pages():
+                self.notebook.set_current_page(cur)
 
         def _build_tabs(self) -> None:
             for cat in VALID_CATEGORIES:
@@ -411,9 +439,12 @@ def _run_gtk_store(controller: StoreController) -> int:
                 self.status_lbl.set_text("Downloading latest GE-Proton from GitHub...")
 
                 def worker() -> None:
-                    _plan, _ok, msg = controller.install_app(app_id)
+                    _plan, ok, msg = controller.install_app(app_id)
                     GLib.idle_add(self.status_lbl.set_text, msg)
-                    GLib.idle_add(btn.set_sensitive, True)
+                    if ok:
+                        GLib.idle_add(self._rebuild_tabs)
+                    else:
+                        GLib.idle_add(btn.set_sensitive, True)
 
                 threading.Thread(target=worker, daemon=True).start()
                 return

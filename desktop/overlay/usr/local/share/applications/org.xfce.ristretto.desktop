@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Photos
+GenericName=Image Viewer
+Comment=Fast image and photo viewer
+Exec=ristretto %F
+Icon=org.xfce.ristretto
+Terminal=false
+StartupNotify=true
+Type=Application
+Categories=Graphics;Viewer;GTK;
+MimeType=image/png;image/jpeg;image/webp;image/gif;image/svg+xml;

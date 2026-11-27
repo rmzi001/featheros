@@ -10,28 +10,37 @@ from featheros.selftest import ESSENTIAL_BINARIES, run_selftest
 from tests.test_featherrun_core import make_mock_probe
 
 
+def _build_healthy_root(root: Path) -> None:
+    (root / "etc").mkdir(parents=True, exist_ok=True)
+    (root / "etc" / "os-release").write_text('PRETTY_NAME="FeatherOS 0.4.0"\n', encoding="utf-8")
+    (root / "etc" / "issue").write_text("FeatherOS 0.4.0\n", encoding="utf-8")
+    (root / "boot").mkdir(exist_ok=True)
+    (root / "boot" / "vmlinuz-6.12.0-amd64").write_bytes(b"vmlinuz")
+
+    files = {
+        "usr/share/themes/FeatherWin11-Dark/gtk-3.0/gtk.css": "ok\n",
+        "usr/share/themes/FeatherWin11-Dark/xfwm4/themerc": "ok\n",
+        "usr/share/themes/FeatherWin11-Light/gtk-3.0/gtk.css": "ok\n",
+        "usr/share/themes/FeatherWin11-Light/xfwm4/themerc": "ok\n",
+        "etc/xdg/autostart/feather-polkit.desktop": "[Desktop Entry]\nName=Polkit\nExec=/usr/local/bin/feather-polkit-agent\n",
+        "usr/lib/x86_64-linux-gnu/polkit-mate-authentication-agent-1": "bin\n",
+        "etc/calamares/branding/featheros/show.qml": "Presentation {}\n",
+        "etc/calamares/modules/removeuser.conf": "username: feather\n",
+        "etc/calamares/modules/users.conf": "sudoersGroup: sudo\n",
+        "etc/calamares/modules/packages.conf": "operations:\n  - try_remove:\n      - live-boot\n",
+        "etc/default/grub": 'GRUB_DISTRIBUTOR="FeatherOS"\n',
+    }
+    for rel, content in files.items():
+        p = root / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+
+
 class TestFeatherSelftest(unittest.TestCase):
     def test_perfect_100_score_on_healthy_featheros(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            (root / "etc").mkdir(parents=True)
-            (root / "etc" / "os-release").write_text('PRETTY_NAME="FeatherOS 0.3.0"\n', encoding="utf-8")
-            (root / "etc" / "issue").write_text("FeatherOS 0.3.0\n", encoding="utf-8")
-            (root / "boot").mkdir()
-            (root / "boot" / "vmlinuz-6.12.0-amd64").write_bytes(b"vmlinuz")
-
-            for rel in (
-                "usr/share/themes/FeatherWin11-Dark/gtk-3.0/gtk.css",
-                "usr/share/themes/FeatherWin11-Light/gtk-3.0/gtk.css",
-                "usr/share/themes/FeatherWin11-Dark/xfwm4/themerc",
-                "etc/xdg/autostart/feather-polkit.desktop",
-                "usr/lib/x86_64-linux-gnu/polkit-mate-authentication-agent-1",
-                "etc/calamares/branding/featheros/show.qml",
-                "etc/calamares/modules/removeuser.conf",
-            ):
-                p = root / rel
-                p.parent.mkdir(parents=True, exist_ok=True)
-                p.write_text("ok\n", encoding="utf-8")
+            _build_healthy_root(root)
 
             def fake_which(name: str) -> str | None:
                 if name in ESSENTIAL_BINARIES or name in ("systemctl", "swapon"):
@@ -60,6 +69,24 @@ class TestFeatherSelftest(unittest.TestCase):
             )
             self.assertEqual(report["score"], 100, report)
             self.assertEqual(report["passed_count"], report["total_checks"])
+
+    def test_detects_duplicate_polkit_autostart_collision(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _build_healthy_root(root)
+            # Simulate duplicate lxpolkit autostart colliding with feather-polkit.desktop
+            (root / "etc" / "xdg" / "autostart" / "lxpolkit.desktop").write_text(
+                "[Desktop Entry]\nName=LXPolkit\nExec=lxpolkit\n", encoding="utf-8"
+            )
+            report = run_selftest(
+                run_cmd=lambda _c, _t: (0, ""),
+                which=lambda n: f"/usr/bin/{n}" if n in ESSENTIAL_BINARIES else None,
+                root=root,
+                probe=make_mock_probe(vulkan_hw=True),
+                run_wine_smoke=False,
+            )
+            checks = {c["id"]: c for c in report["checks"]}
+            self.assertFalse(checks["polkit_agent"]["passed"])
 
     def test_detects_missing_kernel_and_legacy_debt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -65,15 +65,24 @@ class CompatController:
             virtual_desktop=virtual_desktop or None,
         )
 
-    def update_bottle(self, slug: str, **kwargs: Any) -> BottleConfig:
+    def update_bottle(
+        self,
+        slug: str,
+        *,
+        on_applied: Any = None,
+        **kwargs: Any,
+    ) -> BottleConfig:
         cfg = self.manager.update_bottle(slug, **kwargs)
         if self.probe.can_run_wine:
-            threading.Thread(
-                target=self.manager.apply_bottle_settings,
-                args=(cfg.slug,),
-                kwargs={"probe": self.probe},
-                daemon=True,
-            ).start()
+            def _worker() -> None:
+                results = self.manager.apply_bottle_settings(cfg.slug, probe=self.probe)
+                if callable(on_applied):
+                    failed = [c[0] for c, rc in results if rc != 0]
+                    on_applied(cfg.slug, failed)
+
+            threading.Thread(target=_worker, daemon=True).start()
+        elif callable(on_applied):
+            on_applied(cfg.slug, [])
         return cfg
 
     def delete_bottle(self, slug: str) -> bool:
@@ -151,7 +160,7 @@ def _run_gtk_gui(controller: CompatController) -> int:
     import gi  # type: ignore[import-not-found]
 
     gi.require_version("Gtk", "3.0")
-    from gi.repository import Gtk  # type: ignore[import-not-found]
+    from gi.repository import GLib, Gtk  # type: ignore[import-not-found]
 
     apply_fluent_gtk_theme()
 
@@ -240,24 +249,34 @@ def _run_gtk_gui(controller: CompatController) -> int:
                 self.cmb_winver.append(ver, ver.upper())
             grid.attach(self.cmb_winver, 1, 0, 1, 1)
 
+            grid.attach(Gtk.Label(label="Wine / Proton Runner:", xalign=0), 0, 1, 1, 1)
+            self.cmb_runner = Gtk.ComboBoxText()
+            grid.attach(self.cmb_runner, 1, 1, 1, 1)
+
+            grid.attach(Gtk.Label(label="Display DPI Scaling:", xalign=0), 0, 2, 1, 1)
+            self.cmb_dpi = Gtk.ComboBoxText()
+            for dpi_val, dpi_lbl in (("96", "96 DPI (100%)"), ("120", "120 DPI (125%)"), ("144", "144 DPI (150%)"), ("192", "192 DPI (200%)")):
+                self.cmb_dpi.append(dpi_val, dpi_lbl)
+            grid.attach(self.cmb_dpi, 1, 2, 1, 1)
+
             self.chk_dxvk = Gtk.CheckButton(label="Enable DXVK (DirectX 9/10/11 -> Vulkan)")
             self.chk_vkd3d = Gtk.CheckButton(label="Enable VKD3D-Proton (DirectX 12 -> Vulkan)")
             self.chk_gamemode = Gtk.CheckButton(label="Enable Feral GameMode")
             self.chk_mangohud = Gtk.CheckButton(label="Enable MangoHud FPS Overlay")
-            grid.attach(self.chk_dxvk, 0, 1, 2, 1)
-            grid.attach(self.chk_vkd3d, 0, 2, 2, 1)
-            grid.attach(self.chk_gamemode, 0, 3, 2, 1)
-            grid.attach(self.chk_mangohud, 0, 4, 2, 1)
+            grid.attach(self.chk_dxvk, 0, 3, 2, 1)
+            grid.attach(self.chk_vkd3d, 0, 4, 2, 1)
+            grid.attach(self.chk_gamemode, 0, 5, 2, 1)
+            grid.attach(self.chk_mangohud, 0, 6, 2, 1)
 
-            grid.attach(Gtk.Label(label="Virtual Desktop (e.g. 1280x720):", xalign=0), 0, 5, 1, 1)
+            grid.attach(Gtk.Label(label="Virtual Desktop (e.g. 1280x720):", xalign=0), 0, 7, 1, 1)
             self.ent_vdesktop = Gtk.Entry()
             self.ent_vdesktop.set_placeholder_text("Leave blank for native window")
-            grid.attach(self.ent_vdesktop, 1, 5, 1, 1)
+            grid.attach(self.ent_vdesktop, 1, 7, 1, 1)
 
             btn_save = Gtk.Button(label="Save & Apply to Prefix")
             btn_save.get_style_context().add_class("feather-primary")
             btn_save.connect("clicked", self._on_save_settings)
-            grid.attach(btn_save, 0, 6, 2, 1)
+            grid.attach(btn_save, 0, 8, 2, 1)
 
             self.apps_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
             right_col.pack_start(self.apps_box, False, False, 0)
@@ -328,6 +347,13 @@ def _run_gtk_gui(controller: CompatController) -> int:
                 f"<b>Bottle: {escape_pango(b.name)}</b>  <small>[{escape_pango(b.arch)}] — {len(apps)} discovered apps</small>"
             )
             self.cmb_winver.set_active_id(b.windows_version)
+            self.cmb_runner.remove_all()
+            for r in controller.list_runners():
+                self.cmb_runner.append(r.name, f"{r.name} ({r.kind})")
+            if not self.cmb_runner.set_active_id(b.runner):
+                self.cmb_runner.set_active_id("system-wine")
+            if not self.cmb_dpi.set_active_id(str(b.dpi)):
+                self.cmb_dpi.set_active_id("96")
             self.chk_dxvk.set_active(b.dxvk)
             self.chk_vkd3d.set_active(b.vkd3d)
             self.chk_gamemode.set_active(b.gamemode)
@@ -386,17 +412,31 @@ def _run_gtk_gui(controller: CompatController) -> int:
         def _on_save_settings(self, _btn: Any) -> None:
             try:
                 vd = self.ent_vdesktop.get_text().strip() or None
+                dpi_val = int(self.cmb_dpi.get_active_id() or "96")
+                runner_val = self.cmb_runner.get_active_id() or "system-wine"
+
+                def _done(slug: str, failed: list[str]) -> None:
+                    msg = (
+                        f"Saved & applied settings for '{slug}'."
+                        if not failed
+                        else f"Saved '{slug}', warning: prefix step failed ({', '.join(failed)})."
+                    )
+                    GLib.idle_add(self.status_bar.set_text, msg)
+
+                self.status_bar.set_text(f"Applying settings to '{self.selected_slug}' prefix...")
                 controller.update_bottle(
                     self.selected_slug,
                     windows_version=self.cmb_winver.get_active_id() or "win10",
+                    runner=runner_val,
+                    dpi=dpi_val,
                     dxvk=self.chk_dxvk.get_active(),
                     vkd3d=self.chk_vkd3d.get_active(),
                     gamemode=self.chk_gamemode.get_active(),
                     mangohud=self.chk_mangohud.get_active(),
                     virtual_desktop=vd,
+                    on_applied=_done,
                 )
                 self._refresh_bottles()
-                self.status_bar.set_text(f"Saved & applied settings for '{self.selected_slug}'.")
             except Exception as exc:
                 self.status_bar.set_text(f"Error: {exc}")
 

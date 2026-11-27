@@ -19,10 +19,10 @@ from featheros.store import (
 
 
 class TestFeatherStore(unittest.TestCase):
-    def test_catalog_detection_and_apt_plan_runs_update_first(self) -> None:
+    def test_catalog_detection_and_apt_plan_runs_update_with_recommends(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             def fake_which(name: str) -> str | None:
-                return f"/usr/bin/{name}" if name in ("apt-get", "pkexec", "firefox-esr", "calamares") else None
+                return f"/usr/bin/{name}" if name in ("apt-get", "pkexec", "firefox-esr", "calamares", "git") else None
 
             ctrl = StoreController(home=Path(tmp), which=fake_which)
             self.assertTrue(ctrl.has_calamares_installer())
@@ -33,12 +33,18 @@ class TestFeatherStore(unittest.TestCase):
             self.assertTrue(ff["installed"])
             self.assertFalse(chrom["installed"])
 
+            # Multi-binary stack (dev-essentials requires git + gcc + rg) must NOT report installed on git alone
+            dev = ctrl.list_apps(category="developer")
+            dev_ess = next(d for d in dev if d["id"] == "dev-essentials")
+            self.assertFalse(dev_ess["installed"])
+
             plan = ctrl.build_install_plan("steam")
             self.assertTrue(plan.can_execute_locally)
             self.assertEqual(plan.command[0], "/usr/bin/pkexec")
             joined = " ".join(plan.command)
             self.assertIn("apt-get update", joined)
-            self.assertIn("apt-get install -y --no-install-recommends steam-installer", joined)
+            self.assertIn("apt-get install -y steam-installer", joined)
+            self.assertNotIn("--no-install-recommends", joined)
 
     def test_preview_mode_without_apt_and_ge_proton_detection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -48,7 +54,14 @@ class TestFeatherStore(unittest.TestCase):
             wine_bin.parent.mkdir(parents=True)
             wine_bin.write_text("#!/bin/sh\n", encoding="utf-8")
 
-            ctrl = StoreController(home=home, config_dir=cfg, which=lambda _n: None)
+            # feather-calamares alone without calamares must NOT advertise installer
+            ctrl = StoreController(
+                home=home,
+                config_dir=cfg,
+                which=lambda n: "/usr/local/bin/feather-calamares" if n == "feather-calamares" else None,
+            )
+            self.assertFalse(ctrl.has_calamares_installer())
+
             ge_app = ctrl.get_app("ge-proton")
             self.assertTrue(ctrl.is_installed(ge_app))
 
@@ -74,7 +87,7 @@ class TestFeatherStore(unittest.TestCase):
             rc = store_main(["install", "vlc", "--dry-run"])
         self.assertEqual(rc, 0)
         self.assertIn("vlc", buf.getvalue())
-        self.assertGreaterEqual(len(CATALOG), 10)
+        self.assertGreaterEqual(len(CATALOG), 11)
 
 
 if __name__ == "__main__":

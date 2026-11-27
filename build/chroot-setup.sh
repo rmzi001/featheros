@@ -47,9 +47,11 @@ for pkg in "${OPT_PKGS[@]}"; do
   fi
 done
 
-echo "[FeatherOS chroot] Applying FeatherShell v0.3 Windows 11 Dark/Light Glass overlay..."
+echo "[FeatherOS chroot] Applying FeatherShell v0.4 Windows 11 Dark/Light Glass overlay..."
 cp -a "${BUILD_TMP}/overlay/." /
 cp -f /etc/featheros-release /etc/os-release
+# Ensure ONLY feather-polkit.desktop autostarts a Polkit agent (prevents duplicate agent crash dialog)
+rm -f /etc/xdg/autostart/polkit-mate-authentication-agent-1.desktop /etc/xdg/autostart/lxpolkit.desktop
 chmod 0755 \
   /usr/local/bin/feather-firstboot \
   /usr/local/bin/feather-polkit-agent \
@@ -142,7 +144,8 @@ su -s /bin/bash "${LIVE_USER}" -c '
 # Mirror the pre-warmed bottle into /etc/skel (deduplicated by mksquashfs) so disk installs launch .exe instantly too
 mkdir -p /etc/skel/.local/share/featheros/bottles
 cp -a "/home/${LIVE_USER}/.local/share/featheros/bottles/default" /etc/skel/.local/share/featheros/bottles/default
-rm -rf "/etc/skel/.local/share/featheros/bottles/default/prefix/drive_c/users/${LIVE_USER}"
+rm -rf "/etc/skel/.local/share/featheros/bottles/default/prefix/drive_c/users/${LIVE_USER}" \
+       "/etc/skel/.local/share/featheros/bottles/default/prefix/user.reg"
 chown -R root:root /etc/skel/.local/share/featheros
 
 echo "[FeatherOS chroot] Configuring locales, fast-boot services, Plymouth, icons & MIME database..."
@@ -153,8 +156,8 @@ echo 'LANG=en_US.UTF-8' > /etc/default/locale
 systemctl enable lightdm NetworkManager zramswap feather-boot-report || true
 systemctl enable bluetooth || true
 
-# Disable slow background timers during live boot for snappier responsiveness
-systemctl disable apt-daily.timer apt-daily-upgrade.timer man-db.timer dpkg-db-backup.timer fstrim.timer 2>/dev/null || true
+# Disable slow/unneeded background timers & live scrub services for snappier boot
+systemctl disable apt-daily.timer apt-daily-upgrade.timer man-db.timer dpkg-db-backup.timer fstrim.timer e2scrub_all.timer e2scrub_reap.service 2>/dev/null || true
 
 if command -v plymouth-set-default-theme >/dev/null 2>&1; then
   plymouth-set-default-theme featheros || true
@@ -165,6 +168,7 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
 fi
 
 update-desktop-database /usr/share/applications || true
+update-desktop-database /usr/local/share/applications || true
 update-mime-database /usr/share/mime || true
 update-initramfs -u || true
 

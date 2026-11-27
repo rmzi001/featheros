@@ -1,4 +1,4 @@
-# FeatherOS v0.3.0 Core Mandatory Packages (installed with --no-install-recommends)
+# FeatherOS v0.4.0 Core Mandatory Packages (installed with --no-install-recommends)
 # Boot, Kernel, Disk Installer & Live System
 linux-image-amd64
 initramfs-tools
@@ -14,6 +14,7 @@ wget
 unzip
 zram-tools
 plymouth
+plymouth-label
 grub-common
 grub2-common
 grub-pc-bin
@@ -24,8 +25,13 @@ dosfstools
 e2fsprogs
 ntfs-3g
 exfatprogs
+squashfs-tools
+rsync
+calamares
+qml6-module-qtquick
+qml6-module-qtquick-window
 
-# Networking, Audio & Desktop Security
+# Networking, Audio, Disks & Desktop Security (single Polkit agent: mate-polkit)
 network-manager
 network-manager-gnome
 pipewire
@@ -34,11 +40,12 @@ pipewire-alsa
 wireplumber
 pavucontrol
 mate-polkit
+gnome-disk-utility
 xdg-user-dirs
 xdg-desktop-portal-gtk
 libnotify-bin
 
-# FeatherShell v0.3 (Windows 11 Dark/Light Glass on XFCE 4.20)
+# FeatherShell v0.4 (Windows 11 Dark/Light Glass on XFCE 4.20)
 xorg
 xinit
 lightdm
@@ -52,6 +59,7 @@ xfconf
 xfce4-whiskermenu-plugin
 xfce4-pulseaudio-plugin
 xfce4-power-manager
+xfce4-power-manager-plugins
 xfce4-notifyd
 xfce4-clipman
 xfce4-clipman-plugin
@@ -70,6 +78,7 @@ galculator
 atril
 mpv
 xarchiver
+firefox-esr
 papirus-icon-theme
 adwaita-icon-theme
 fonts-inter

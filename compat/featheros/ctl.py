@@ -26,8 +26,6 @@ class PerformanceProfile:
     label: str
     description: str
     compositor_enabled: bool
-    swappiness: int
-    cpu_governor: str
     default_gamemode: bool
 
     def to_dict(self) -> dict[str, Any]:
@@ -38,10 +36,8 @@ PROFILES: dict[str, PerformanceProfile] = {
     "balanced": PerformanceProfile(
         name="balanced",
         label="Balanced",
-        description="XFCE compositing on, smooth Windows 11 glass visuals, ~380 MB RAM idle.",
+        description="XFCE compositing on, smooth Windows 11 glass visuals (~450-550 MB RAM idle).",
         compositor_enabled=True,
-        swappiness=60,
-        cpu_governor="schedutil",
         default_gamemode=False,
     ),
     "low-ram": PerformanceProfile(
@@ -49,17 +45,13 @@ PROFILES: dict[str, PerformanceProfile] = {
         label="Low-RAM Saver",
         description="Disables XFCE compositor shadows & animations for 2-4 GB PCs.",
         compositor_enabled=False,
-        swappiness=100,
-        cpu_governor="powersave",
         default_gamemode=False,
     ),
     "gaming": PerformanceProfile(
         name="gaming",
         label="Gaming Performance",
-        description="Disables desktop compositor for lowest input latency and GameMode defaults.",
+        description="Disables desktop compositor for lowest input latency and enables GameMode on Windows launches.",
         compositor_enabled=False,
-        swappiness=30,
-        cpu_governor="performance",
         default_gamemode=True,
     ),
 }
@@ -147,7 +139,54 @@ def get_theme_mode(config_dir: str | Path | None = None) -> str:
     return read_theme_mode(config_dir=get_config_dir(config_dir))
 
 
-def build_theme_actions(mode: str) -> list[list[str]]:
+def _discover_wallpaper_props() -> list[str]:
+    """Discover all active XFCE desktop wallpaper properties across real & virtual monitors."""
+    defaults = [
+        "/backdrop/screen0/monitor0/workspace0/last-image",
+        "/backdrop/screen0/monitorVirtual-1/workspace0/last-image",
+        "/backdrop/screen0/monitorVGA-1/workspace0/last-image",
+    ]
+    try:
+        proc = subprocess.run(
+            ["xfconf-query", "-c", "xfce4-desktop", "-l"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+        if proc.returncode == 0:
+            found = [ln.strip() for ln in proc.stdout.splitlines() if ln.strip().endswith("last-image")]
+            if found:
+                return found
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return defaults
+
+
+def _sync_gtk3_settings_ini(mode: str) -> None:
+    """Keep ~/.config/gtk-3.0/settings.ini in sync for Firefox, Electron, and GTK3 apps."""
+    is_dark = mode == "dark"
+    ini_path = Path.home() / ".config" / "gtk-3.0" / "settings.ini"
+    try:
+        ini_path.parent.mkdir(parents=True, exist_ok=True)
+        ini_path.write_text(
+            "[Settings]\n"
+            f"gtk-application-prefer-dark-theme={'1' if is_dark else '0'}\n"
+            f"gtk-theme-name={'FeatherWin11-Dark' if is_dark else 'FeatherWin11-Light'}\n"
+            f"gtk-icon-theme-name={'Papirus-Dark' if is_dark else 'Papirus-Light'}\n"
+            "gtk-font-name=Inter 10\n"
+            "gtk-cursor-theme-name=Adwaita\n"
+            "gtk-cursor-theme-size=24\n"
+            "gtk-enable-animations=1\n",
+            encoding="utf-8",
+            newline="\n",
+        )
+    except OSError:
+        pass
+
+
+def build_theme_actions(mode: str, *, wallpaper_props: Sequence[str] | None = None) -> list[list[str]]:
     """Build XFCE 4.20 commands to switch FeatherOS between Dark Glass and Light Glass."""
     is_dark = mode == "dark"
     gtk_theme = "FeatherWin11-Dark" if is_dark else "FeatherWin11-Light"
@@ -161,7 +200,7 @@ def build_theme_actions(mode: str) -> list[list[str]]:
     rgba = (
         ["0.06", "0.08", "0.12", "0.88"] if is_dark else ["0.95", "0.97", "0.99", "0.90"]
     )
-    return [
+    actions: list[list[str]] = [
         ["xfconf-query", "-c", "xsettings", "-p", "/Net/ThemeName", "-s", gtk_theme],
         ["xfconf-query", "-c", "xsettings", "-p", "/Net/IconThemeName", "-s", icon_theme],
         ["xfconf-query", "-c", "xfwm4", "-p", "/general/theme", "-s", gtk_theme],
@@ -178,34 +217,11 @@ def build_theme_actions(mode: str) -> list[list[str]]:
             "-t", "double", "-s", rgba[2],
             "-t", "double", "-s", rgba[3],
         ],
-        [
-            "xfconf-query",
-            "-c",
-            "xfce4-desktop",
-            "-p",
-            "/backdrop/screen0/monitor0/workspace0/last-image",
-            "-s",
-            wallpaper,
-        ],
-        [
-            "xfconf-query",
-            "-c",
-            "xfce4-desktop",
-            "-p",
-            "/backdrop/screen0/monitorVirtual-1/workspace0/last-image",
-            "-s",
-            wallpaper,
-        ],
-        [
-            "xfconf-query",
-            "-c",
-            "xfce4-desktop",
-            "-p",
-            "/backdrop/screen0/monitorVGA-1/workspace0/last-image",
-            "-s",
-            wallpaper,
-        ],
     ]
+    props = list(wallpaper_props) if wallpaper_props is not None else _discover_wallpaper_props()
+    for prop in props:
+        actions.append(["xfconf-query", "-c", "xfce4-desktop", "-p", prop, "-s", wallpaper])
+    return actions
 
 
 def apply_theme_mode(
@@ -228,6 +244,8 @@ def apply_theme_mode(
     if not dry_run:
         cfg_root.mkdir(parents=True, exist_ok=True)
         cfg_file.write_text(json.dumps({"mode": norm}, indent=2) + "\n", encoding="utf-8")
+        if runner is None:
+            _sync_gtk3_settings_ini(norm)
         for cmd in actions:
             if runner is not None:
                 rc = runner(cmd)

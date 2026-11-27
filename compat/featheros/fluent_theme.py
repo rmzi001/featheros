@@ -180,6 +180,16 @@ list, listbox {
     border-radius: 10px;
 }
 
+list row, listbox row {
+    padding: 8px 10px;
+    border-radius: 6px;
+    color: #1e293b;
+}
+
+list row:hover, listbox row:hover {
+    background-color: rgba(15, 23, 42, 0.05);
+}
+
 list row:selected, listbox row:selected {
     background-color: rgba(2, 132, 199, 0.14);
     color: #0369a1;
@@ -228,20 +238,36 @@ button:hover {
     border-color: #0284c7;
 }
 
+button:disabled {
+    background-color: #f1f5f9;
+    color: #94a3b8;
+    border-color: rgba(15, 23, 42, 0.07);
+}
+
 button.suggested-action, button.feather-primary {
     background-color: #0284c7;
     color: #ffffff;
     border-color: #0284c7;
 }
 
-entry, combobox button {
+button.suggested-action:hover, button.feather-primary:hover {
+    background-color: #0369a1;
+}
+
+entry, combobox button, spinbutton {
     background-color: #ffffff;
     color: #0f172a;
     border: 1px solid rgba(15, 23, 42, 0.16);
     border-radius: 8px;
     padding: 6px 10px;
 }
+
+entry:focus {
+    border-color: #0284c7;
+}
 """
+
+_ACTIVE_GTK_PROVIDER: object | None = None
 
 
 def read_theme_mode(config_dir: str | Path | None = None) -> str:
@@ -264,6 +290,7 @@ def read_theme_mode(config_dir: str | Path | None = None) -> str:
 
 def apply_fluent_gtk_theme(mode: str | None = None) -> bool:
     """Apply FeatherOS Windows 11 Dark or Light Glass CSS to the active GTK3 screen."""
+    global _ACTIVE_GTK_PROVIDER
     try:
         import gi  # type: ignore[import-not-found]
 
@@ -282,7 +309,10 @@ def apply_fluent_gtk_theme(mode: str | None = None) -> bool:
     provider.load_from_data(css.encode("utf-8"))
     screen = Gdk.Screen.get_default()
     if screen is not None:
+        if _ACTIVE_GTK_PROVIDER is not None:
+            Gtk.StyleContext.remove_provider_for_screen(screen, _ACTIVE_GTK_PROVIDER)
         Gtk.StyleContext.add_provider_for_screen(
             screen, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
         )
+        _ACTIVE_GTK_PROVIDER = provider
     return True

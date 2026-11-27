@@ -37,6 +37,8 @@
       <property name="&lt;Super&gt;Down" type="string" value="hide_window_key"/>
       <property name="&lt;Super&gt;Left" type="string" value="tile_left_key"/>
       <property name="&lt;Super&gt;Right" type="string" value="tile_right_key"/>
+      <property name="&lt;Primary&gt;&lt;Super&gt;Left" type="string" value="prev_workspace_key"/>
+      <property name="&lt;Primary&gt;&lt;Super&gt;Right" type="string" value="next_workspace_key"/>
       <property name="&lt;Super&gt;d" type="string" value="show_desktop_key"/>
     </property>
   </property>

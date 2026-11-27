@@ -1,4 +1,4 @@
-"""Unit tests for FeatherOS Windows-style Unified Settings Hub (v0.2.0)."""
+"""Unit tests for FeatherOS Windows-style Unified Settings Hub (v0.4.0)."""
 
 from __future__ import annotations
 
@@ -26,6 +26,9 @@ class TestFeatherSettingsHub(unittest.TestCase):
             self.assertEqual(len(ctrl.list_sections()), len(SECTIONS))
 
             sys_items = ctrl.list_actions(section="system")
+            sys_ids = {i["id"] for i in sys_items}
+            for expected in ("display", "power", "accessibility", "date-time", "storage-disks", "user-password"):
+                self.assertIn(expected, sys_ids)
             disp = next(i for i in sys_items if i["id"] == "display")
             pwr = next(i for i in sys_items if i["id"] == "power")
             self.assertTrue(disp["available"])

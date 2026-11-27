@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=File Explorer
+GenericName=File Manager
+Comment=Browse files, folders, and Windows Drive (C:)
+Exec=thunar %F
+Icon=org.xfce.thunar
+Terminal=false
+StartupNotify=true
+Type=Application
+Categories=System;Core;GTK;FileTools;FileManager;
+MimeType=inode/directory;

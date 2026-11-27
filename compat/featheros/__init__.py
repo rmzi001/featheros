@@ -1,4 +1,5 @@
-"""FeatherOS Windows compatibility layer, settings hub, QA agent, and system control suite."""
+"""FeatherOS Windows compatibility & desktop suite."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __codename__ = "plume-wholesome"
+__codename_display__ = "Plume Wholesome"

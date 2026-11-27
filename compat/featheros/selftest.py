@@ -1,9 +1,9 @@
 """feather-selftest: Automated in-OS QA Checking Agent for FeatherOS.
 
 Runs inside a live booted FeatherOS session (or headless CI KVM VM) to verify
-boot health, memory/zram efficiency, Windows .exe execution via Wine, desktop
-completeness, Polkit elevation, Calamares readiness, and MIME integration,
-producing an empirical 100-point QA scorecard.
+boot health, memory/zram efficiency, Windows .exe execution via Wine & FeatherRun,
+desktop completeness, single Polkit agent integrity, Calamares disk-installer
+readiness, and hygiene, producing an empirical 100-point QA scorecard.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ import sys
 import tempfile
 from typing import Any, Callable, Sequence
 
-from . import __codename__, __version__
+from . import __codename__, __codename_display__, __version__
 from .system_probe import SystemProbe, probe_system
 
 CommandRunner = Callable[[list[str], int], tuple[int, str]]
@@ -35,10 +35,14 @@ ESSENTIAL_BINARIES: tuple[str, ...] = (
     "xfce4-screenshooter",
     "mousepad",
     "ristretto",
+    "firefox-esr",
     "wine",
     "grub-install",
     "efibootmgr",
     "ntfs-3g",
+    "unsquashfs",
+    "rsync",
+    "calamares",
     "feather-run",
     "feather-compat",
     "feather-settings",
@@ -107,6 +111,26 @@ def _find_binary(name: str, which: WhichLookup, root: Path) -> str | None:
             if candidate.is_file():
                 return str(candidate)
     return None
+
+
+def _count_enabled_polkit_autostarts(root: Path) -> list[str]:
+    """Return active Polkit agent .desktop filenames in /etc/xdg/autostart."""
+    autostart_dir = root / "etc" / "xdg" / "autostart"
+    if not autostart_dir.is_dir():
+        return []
+    active: list[str] = []
+    for df in sorted(autostart_dir.glob("*.desktop")):
+        text = df.read_text(encoding="utf-8", errors="ignore")
+        low = text.lower()
+        if not any(tok in low for tok in ("polkit", "lxpolkit")):
+            continue
+        if "hidden=true" in low or "nodisplay=true" in low and "exec=" not in low:
+            continue
+        # Respect explicit Hidden=true in .desktop
+        if any(ln.strip().lower() == "hidden=true" for ln in text.splitlines()):
+            continue
+        active.append(df.name)
+    return active
 
 
 def run_selftest(
@@ -181,7 +205,7 @@ def run_selftest(
         ram_detail = "Unable to read /proc/meminfo"
     checks.append(CheckResult("ram_footprint", "performance", ram_ok, 10, ram_detail))
 
-    # 5. Desktop binaries completeness (14 pts)
+    # 5. Desktop & installer binaries completeness (14 pts)
     missing_bins = [b for b in ESSENTIAL_BINARIES if _find_binary(b, which, root) is None]
     bins_ok = len(missing_bins) == 0
     checks.append(
@@ -200,37 +224,41 @@ def run_selftest(
     dark_css = root / "usr" / "share" / "themes" / "FeatherWin11-Dark" / "gtk-3.0" / "gtk.css"
     light_css = root / "usr" / "share" / "themes" / "FeatherWin11-Light" / "gtk-3.0" / "gtk.css"
     dark_wm = root / "usr" / "share" / "themes" / "FeatherWin11-Dark" / "xfwm4" / "themerc"
-    themes_ok = dark_css.is_file() and light_css.is_file() and dark_wm.is_file()
+    light_wm = root / "usr" / "share" / "themes" / "FeatherWin11-Light" / "xfwm4" / "themerc"
+    themes_ok = dark_css.is_file() and light_css.is_file() and dark_wm.is_file() and light_wm.is_file()
     checks.append(
         CheckResult(
             id="fluent_themes",
             category="ui",
             passed=themes_ok,
             weight=8,
-            detail="FeatherWin11-Dark, FeatherWin11-Light & Fluent XFWM4 borders installed"
+            detail="FeatherWin11-Dark & FeatherWin11-Light GTK3 + XFWM4 themes installed"
             if themes_ok
-            else "One or more FeatherWin11 theme assets missing",
+            else "One or more FeatherWin11 Dark/Light theme assets missing",
         )
     )
 
-    # 7. Polkit auth agent installed & XFCE autostart configured (8 pts)
-    polkit_auto = root / "etc" / "xdg" / "autostart" / "feather-polkit.desktop"
+    # 7. Single Polkit auth agent installed & no duplicate autostart collision (8 pts)
+    polkit_autostarts = _count_enabled_polkit_autostarts(root)
     polkit_candidates = (
         root / "usr" / "lib" / "x86_64-linux-gnu" / "polkit-mate-authentication-agent-1",
         root / "usr" / "lib" / "mate-polkit" / "polkit-mate-authentication-agent-1",
         root / "usr" / "lib" / "policykit-1-gnome" / "polkit-gnome-authentication-agent-1",
     )
     polkit_bin = any(p.is_file() for p in polkit_candidates) or _find_binary("lxpolkit", which, root) is not None
-    polkit_ok = polkit_auto.is_file() and polkit_bin
+    polkit_ok = polkit_bin and len(polkit_autostarts) == 1
+    polkit_detail = (
+        f"Single Polkit agent configured cleanly ({polkit_autostarts[0]})"
+        if polkit_ok
+        else f"Polkit defect: bin={polkit_bin}, active_autostarts={polkit_autostarts}"
+    )
     checks.append(
         CheckResult(
             id="polkit_agent",
             category="security",
             passed=polkit_ok,
             weight=8,
-            detail="Polkit agent binary and XFCE autostart present"
-            if polkit_ok
-            else "Polkit auth agent missing or not configured for XFCE",
+            detail=polkit_detail,
         )
     )
 
@@ -239,16 +267,25 @@ def run_selftest(
     has_kernel = boot_dir.is_dir() and any(boot_dir.glob("vmlinuz-*"))
     has_qml = (root / "etc" / "calamares" / "branding" / "featheros" / "show.qml").is_file()
     has_cleanup = (root / "etc" / "calamares" / "modules" / "removeuser.conf").is_file()
-    cal_ok = has_kernel and has_qml and has_cleanup and _find_binary("grub-install", which, root) is not None
+    users_conf = root / "etc" / "calamares" / "modules" / "users.conf"
+    has_users = users_conf.is_file() and "sudoersGroup: sudo" in users_conf.read_text(encoding="utf-8", errors="ignore")
+    pkgs_conf = root / "etc" / "calamares" / "modules" / "packages.conf"
+    pkgs_safe = pkgs_conf.is_file() and "try_remove:" in pkgs_conf.read_text(encoding="utf-8", errors="ignore")
+    has_grub_def = (root / "etc" / "default" / "grub").is_file()
+    cal_bins = all(_find_binary(b, which, root) is not None for b in ("calamares", "unsquashfs", "rsync", "grub-install"))
+    cal_ok = has_kernel and has_qml and has_cleanup and has_users and pkgs_safe and has_grub_def and cal_bins
     checks.append(
         CheckResult(
             id="calamares_ready",
             category="installer",
             passed=cal_ok,
             weight=10,
-            detail="Kernel in /boot, grub-install, QML slideshow & live-user cleanup ready"
+            detail="Kernel in /boot, unsquashfs, rsync, grub-install, /etc/default/grub, users.conf, try_remove & QML ready"
             if cal_ok
-            else f"Incomplete installer: kernel={has_kernel}, qml={has_qml}, cleanup={has_cleanup}",
+            else (
+                f"Incomplete installer: kernel={has_kernel}, qml={has_qml}, cleanup={has_cleanup}, "
+                f"users={has_users}, try_remove={pkgs_safe}, default_grub={has_grub_def}, bins={cal_bins}"
+            ),
         )
     )
 
@@ -335,7 +372,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.json:
         print(json.dumps(report, indent=2))
     else:
-        print(f"=== FEATHEROS QA CHECKING AGENT (v{__version__} {__codename__}) ===")
+        print(f"=== FEATHEROS QA CHECKING AGENT (v{__version__} {__codename_display__}) ===")
         for chk in report["checks"]:
             mark = "PASS" if chk["passed"] else "FAIL"
             print(f"  [{mark}] ({chk['weight']:2d} pts) {chk['id']:18s} — {chk['detail']}")

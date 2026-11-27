@@ -47,4 +47,4 @@ if ($InstallQemu) {
 Write-Host "Next steps to build your FeatherOS ISO:" -ForegroundColor Cyan
 Write-Host "  Option A (Cloud / zero local disk pressure): Push this repo to GitHub and run 'FeatherOS CI & ISO Builder' workflow."
 Write-Host "  Option B (Local WSL2 Debian): Run 'wsl --install -d Debian' in an Admin terminal, reboot, then run 'sudo ./build/build-iso.sh'."
-Write-Host "  Boot test ISO in VM: .\scripts\run-qemu.ps1 -IsoPath .\dist\featheros-0.3.0-amd64.iso"
+Write-Host "  Boot test ISO in VM: .\scripts\run-qemu.ps1 -IsoPath .\dist\featheros-0.4.0-amd64.iso"

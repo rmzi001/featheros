@@ -5,7 +5,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-ISO_PATH="${1:-${REPO_ROOT}/dist/featheros-0.3.0-amd64.iso}"
+ISO_PATH="${1:-${REPO_ROOT}/dist/featheros-0.4.0-amd64.iso}"
 RAM_MB="${RAM_MB:-2048}"
 CPUS="${CPUS:-2}"
 DISK_PATH="${DISK_PATH:-}"

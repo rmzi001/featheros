@@ -11,7 +11,7 @@ import subprocess
 import sys
 from typing import Any, Callable, Sequence
 
-from . import __codename__, __version__
+from . import __codename__, __codename_display__, __version__
 from .bottles import get_featheros_home
 from .ctl import (
     PROFILES,
@@ -91,6 +91,50 @@ SETTINGS_ACTIONS: tuple[SettingsAction, ...] = (
         description="Manage programs that start automatically when you sign in.",
         command=("xfce4-session-settings",),
         check_binary="xfce4-session-settings",
+    ),
+    SettingsAction(
+        id="accessibility",
+        section="system",
+        title="Accessibility & Assistive Tech",
+        description="Configure keyboard bounce/sticky keys, mouse keys, and screen assist.",
+        command=("xfce4-accessibility-settings",),
+        check_binary="xfce4-accessibility-settings",
+    ),
+    SettingsAction(
+        id="date-time",
+        section="system",
+        title="Date, Time & Timezone",
+        description="View clock sync status and configure your system timezone.",
+        command=(
+            "xfce4-terminal",
+            "-x",
+            "bash",
+            "-c",
+            "timedatectl status; echo; pkexec dpkg-reconfigure tzdata; echo; read -r -p 'Done. Press Enter...' _",
+        ),
+        check_binary="timedatectl",
+    ),
+    SettingsAction(
+        id="storage-disks",
+        section="system",
+        title="Disks & Storage Drives",
+        description="Inspect SSDs, USB drives, SMART health, partitions, and mount points.",
+        command=("gnome-disks",),
+        check_binary="gnome-disks",
+    ),
+    SettingsAction(
+        id="user-password",
+        section="system",
+        title="User Account & Password",
+        description="Change your account password and review group memberships.",
+        command=(
+            "xfce4-terminal",
+            "-x",
+            "bash",
+            "-c",
+            "id; echo; passwd; echo; read -r -p 'Done. Press Enter...' _",
+        ),
+        check_binary="passwd",
     ),
     # Network
     SettingsAction(
@@ -220,7 +264,7 @@ SETTINGS_ACTIONS: tuple[SettingsAction, ...] = (
             "-x",
             "bash",
             "-c",
-            "sudo apt-get update && sudo apt-get upgrade; echo; read -r -p 'Done. Press Enter...' _",
+            "pkexec bash -c 'apt-get update && apt-get upgrade -y'; echo; read -r -p 'Done. Press Enter...' _",
         ),
         check_binary="apt-get",
     ),
@@ -357,7 +401,7 @@ def _run_gtk_settings(controller: SettingsController) -> int:
 
             brand = Gtk.Label(xalign=0)
             brand.set_markup(
-                f"<b><big>Settings</big></b>\n<small>FeatherOS v{escape_pango(__version__)} ({escape_pango(__codename__)})</small>"
+                f"<b><big>Settings</big></b>\n<small>FeatherOS v{escape_pango(__version__)} ({escape_pango(__codename_display__)})</small>"
             )
             sidebar_box.pack_start(brand, False, False, 0)
 
@@ -462,7 +506,7 @@ def _run_gtk_settings(controller: SettingsController) -> int:
                 banner.get_style_context().add_class("feather-card")
                 info_lbl = Gtk.Label(xalign=0)
                 info_lbl.set_markup(
-                    f"<b>About This PC — FeatherOS {escape_pango(__version__)} ({escape_pango(__codename__)})</b>\n"
+                    f"<b>About This PC — FeatherOS {escape_pango(__version__)} ({escape_pango(__codename_display__)})</b>\n"
                     f"<small>CPUs: {escape_pango(sys_info['cpu_count'])}  •  Memory: {escape_pango(ram_text)}  •  Storage: {escape_pango(disk_text)}\n"
                     f"Active Profile: {escape_pango(prof['label'])}  •  Graphics: {escape_pango(controller.probe.recommended_graphics_backend.upper())}  •  Bottles: {escape_pango(st['bottles_count'])}</small>"
                 )
@@ -499,6 +543,8 @@ def _run_gtk_settings(controller: SettingsController) -> int:
                 self.cards_box.pack_start(t_card, False, False, 0)
 
             for item in controller.list_actions(section=section_id):
+                if item["id"] == "install-disk" and not item["available"]:
+                    continue
                 self._add_action_card(item)
 
             self.cards_box.show_all()

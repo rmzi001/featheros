@@ -1,0 +1,8 @@
+// Live-session-only Polkit rule: allows local active live user 'feather' to authenticate
+// smoothly for Calamares, FeatherStore, and Settings without an unknown password prompt.
+// Removed automatically during hard-drive installation by Calamares shellprocess.conf.
+polkit.addRule(function(action, subject) {
+    if (subject.user === "feather" && subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});

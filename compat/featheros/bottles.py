@@ -331,6 +331,20 @@ class BottleManager:
         else:
             chosen_name = "default"
 
+        if not info.valid:
+            # Never create orphan bottle directories on disk for invalid/ARM64 binaries
+            slug = slugify(chosen_name)
+            ephemeral = BottleConfig(name=chosen_name, slug=slug, arch=info.recommended_winearch)
+            return LaunchPlan(
+                bottle=ephemeral,
+                prefix_path=self.prefix_dir(slug),
+                binary_info=info,
+                command=[],
+                env={},
+                effective_backend="wined3d",
+                notices=[],
+            )
+
         cfg = self.ensure_bottle(chosen_name, arch=info.recommended_winearch)
         prefix_path = self.prefix_dir(cfg.slug)
 
@@ -399,11 +413,25 @@ class BottleManager:
 
         env.update(cfg.env)
 
+        # Honor global Gaming Performance profile default_gamemode automatically
+        profile_gamemode = False
+        try:
+            xdg_cfg = os.environ.get("XDG_CONFIG_HOME")
+            prof_file = (
+                (Path(xdg_cfg) / "featheros" / "profile.json")
+                if xdg_cfg
+                else (Path.home() / ".config" / "featheros" / "profile.json")
+            )
+            if prof_file.is_file():
+                profile_gamemode = json.loads(prof_file.read_text(encoding="utf-8")).get("profile") == "gaming"
+        except (OSError, ValueError):
+            profile_gamemode = False
+
         cmd: list[str] = []
-        if cfg.gamemode:
+        if cfg.gamemode or profile_gamemode:
             if sys_probe.gamemoderun_path:
                 cmd.append(sys_probe.gamemoderun_path)
-            else:
+            elif cfg.gamemode:
                 notices.append("GameMode enabled on bottle, but 'gamemoderun' is not installed.")
         if cfg.mangohud:
             if sys_probe.mangohud_path:
@@ -479,7 +507,7 @@ class BottleManager:
         if cfg.dxvk and sys_probe.vulkan_hardware_ready and sys_probe.dxvk_available:
             dxvk_setup = shutil.which("dxvk-setup")
             if dxvk_setup:
-                commands.append([dxvk_setup, "install", "--symlink"])
+                commands.append([dxvk_setup, "install"])
 
         env = {
             "WINEPREFIX": str(prefix),

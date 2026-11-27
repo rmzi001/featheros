@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Text Editor
+GenericName=Notepad
+Comment=Simple fast text and code editor
+Exec=mousepad %F
+Icon=org.xfce.mousepad
+Terminal=false
+StartupNotify=true
+Type=Application
+Categories=Utility;TextEditor;GTK;
+MimeType=text/plain;

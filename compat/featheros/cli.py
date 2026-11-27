@@ -132,6 +132,8 @@ def _cmd_bottles(args: argparse.Namespace, manager: BottleManager) -> int:
             print("No configuration fields specified.", file=sys.stderr)
             return 2
         updated = manager.update_bottle(args.name, **updates)
+        if not getattr(args, "dry_run", False):
+            manager.apply_bottle_settings(updated.slug)
         if args.json:
             _print_json(updated.to_dict())
         else:
@@ -234,12 +236,28 @@ def _cmd_run(args: argparse.Namespace, manager: BottleManager) -> int:
         return 127
 
     is_first_run = not (plan.prefix_path / "system.reg").is_file()
-    if is_first_run:
+    dxvk_marker = plan.prefix_path / ".featheros-dxvk-applied"
+    needs_dxvk_install = (
+        plan.effective_backend.startswith("dxvk")
+        and shutil.which("dxvk-setup") is not None
+        and not dxvk_marker.is_file()
+    )
+    if is_first_run or needs_dxvk_install:
         _notify_desktop(
             "Preparing Windows Environment",
-            f"Initializing bottle '{plan.bottle.name}' ({plan.bottle.windows_version}) for first run...",
+            f"Configuring bottle '{plan.bottle.name}' ({plan.bottle.windows_version})...",
         )
-        manager.apply_bottle_settings(plan.bottle.slug, probe=probe)
+        results = manager.apply_bottle_settings(plan.bottle.slug, probe=probe)
+        if needs_dxvk_install and any("dxvk-setup" in c[0] and rc == 0 for c, rc in results):
+            try:
+                dxvk_marker.write_text("installed\n", encoding="utf-8")
+            except OSError:
+                pass
+    elif _is_gui_session():
+        _notify_desktop(
+            "Launching Windows App",
+            f"Starting {Path(args.target).name} in bottle '{plan.bottle.name}'...",
+        )
 
     manager.touch_last_used(plan.bottle.slug)
     merged_env = os.environ.copy()
@@ -249,6 +267,14 @@ def _cmd_run(args: argparse.Namespace, manager: BottleManager) -> int:
 
     if not args.no_sync:
         sync_bottle_shortcuts(manager, plan.bottle.slug)
+
+    if proc.returncode != 0 and _is_gui_session():
+        _show_gui_error(
+            f"{Path(args.target).name} exited unexpectedly",
+            f"Exit code {proc.returncode} in bottle '{plan.bottle.name}'.\n"
+            "Try installing Visual C++ / .NET runtimes in FeatherOS Compatibility Manager, "
+            "or run 'feather-run --debug' in Terminal for detailed logs.",
+        )
 
     return proc.returncode
 

@@ -1,4 +1,4 @@
-# FeatherOS v0.3.0 (`Plume Wholesome`)
+# FeatherOS v0.4.0 (`Plume Wholesome`)
 
 **FeatherOS** is a lightweight, bootable x86_64 operating system built on **Debian Minimal** (`amd64` + `i386` multiarch) with a modern **Windows 11 Dark & Light Glass** desktop (**FeatherShell on XFCE 4.20**) and seamless `.exe` / `.msi` compatibility (**FeatherRun**).
 
@@ -58,7 +58,7 @@ python -m featheros.ctl status
 
 ---
 
-## Building the Bootable ISO (`featheros-0.3.0-amd64.iso`)
+## Building the Bootable ISO (`featheros-0.4.0-amd64.iso`)
 
 ### Option 1: Cloud Build via GitHub Actions (Recommended on Windows)
 1. Push to GitHub or open **Actions → FeatherOS CI & ISO Builder → Run workflow**.
@@ -82,7 +82,7 @@ docker run --rm --privileged -v "$(pwd):/workspace" featheros-builder
 ## Boot-Testing in QEMU
 
 ```powershell
-.\scripts\run-qemu.ps1 -IsoPath .\dist\featheros-0.3.0-amd64.iso -RamMB 2048 -Cpus 2
+.\scripts\run-qemu.ps1 -IsoPath .\dist\featheros-0.4.0-amd64.iso -RamMB 2048 -Cpus 2
 ```
 
 Live credentials: user `feather`, password `feather` (auto-logs in with passwordless `sudo`).

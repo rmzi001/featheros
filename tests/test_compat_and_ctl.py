@@ -120,6 +120,26 @@ class TestRunners(unittest.TestCase):
             with self.assertRaises(ValueError):
                 safe_extract_tarball(sym_tar, Path(tmp) / "out")
 
+            # Escaping hardlink attempt (tar hardlink targets are relative to extraction root)
+            lnk_tar = Path(tmp) / "lnk.tar.gz"
+            with tarfile.open(lnk_tar, "w:gz") as tf:
+                info = tarfile.TarInfo(name="sub/hardlink")
+                info.type = tarfile.LNKTYPE
+                info.linkname = "../outside.txt"
+                tf.addfile(info)
+
+            with self.assertRaises(ValueError):
+                safe_extract_tarball(lnk_tar, Path(tmp) / "out")
+
+            # Non-HTTPS GE-Proton download URL rejected
+            with self.assertRaises(ValueError):
+                parse_ge_proton_release(
+                    {
+                        "tag_name": "GE-Proton9-25",
+                        "assets": [{"name": "GE-Proton9-25.tar.gz", "browser_download_url": "http://evil/x.tar.gz"}],
+                    }
+                )
+
 
 class TestFeatherCtl(unittest.TestCase):
     def test_profile_switching_theme_mode_and_persistence(self) -> None:

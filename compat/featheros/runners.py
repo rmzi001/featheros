@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 import json
 from pathlib import Path
 import tarfile
@@ -86,6 +87,7 @@ class ReleaseAsset:
     asset_name: str
     download_url: str
     size_bytes: int
+    sha512_url: str | None = None
 
 
 def list_installed_runners(home: str | Path | None = None) -> list[InstalledRunner]:
@@ -129,20 +131,32 @@ def list_installed_runners(home: str | Path | None = None) -> list[InstalledRunn
 
 
 def parse_ge_proton_release(release_json: dict[str, Any]) -> ReleaseAsset:
-    """Extract the .tar.gz download asset from a GitHub Release API payload."""
+    """Extract the .tar.gz download asset and optional .sha512sum URL from GitHub Release JSON."""
     tag = str(release_json.get("tag_name") or "").strip()
     if not tag:
         raise ValueError("Release payload missing tag_name")
 
-    for asset in release_json.get("assets", []):
+    assets = release_json.get("assets", [])
+    sha512_url: str | None = None
+    for asset in assets:
+        name = str(asset.get("name") or "")
+        url = str(asset.get("browser_download_url") or "")
+        if name.endswith(".sha512sum") and url.startswith("https://"):
+            sha512_url = url
+            break
+
+    for asset in assets:
         name = str(asset.get("name") or "")
         url = str(asset.get("browser_download_url") or "")
         if name.endswith(".tar.gz") and url:
+            if not url.startswith("https://"):
+                raise ValueError(f"Refusing non-HTTPS download URL: {url}")
             return ReleaseAsset(
                 tag=tag,
                 asset_name=name,
                 download_url=url,
                 size_bytes=int(asset.get("size") or 0),
+                sha512_url=sha512_url,
             )
     raise ValueError(f"No .tar.gz asset found in release '{tag}'")
 
@@ -173,7 +187,7 @@ def _ensure_within(dest: Path, candidate: Path, label: str) -> None:
 
 
 def safe_extract_tarball(archive_path: str | Path, dest_dir: str | Path) -> Path:
-    """Safely extract a runner .tar.gz archive, blocking path & symlink traversal."""
+    """Safely extract a runner .tar.gz archive, blocking path, symlink, and hardlink traversal."""
     archive = Path(archive_path)
     dest = Path(dest_dir).resolve()
     dest.mkdir(parents=True, exist_ok=True)
@@ -182,9 +196,13 @@ def safe_extract_tarball(archive_path: str | Path, dest_dir: str | Path) -> Path
         for member in tf.getmembers():
             member_path = (dest / member.name).resolve()
             _ensure_within(dest, member_path, member.name)
-            if member.issym() or member.islnk():
+            if member.issym():
                 link_target = (member_path.parent / member.linkname).resolve()
                 _ensure_within(dest, link_target, f"{member.name} -> {member.linkname}")
+            elif member.islnk():
+                # Tar hardlink linkname is relative to archive extraction root (dest)
+                link_target = (dest / member.linkname).resolve()
+                _ensure_within(dest, link_target, f"{member.name} => {member.linkname}")
         if hasattr(tarfile, "data_filter"):
             tf.extractall(dest, filter="data")
         else:
@@ -193,14 +211,35 @@ def safe_extract_tarball(archive_path: str | Path, dest_dir: str | Path) -> Path
     return dest
 
 
+def _verify_sha512(file_path: Path, checksum_text: str) -> None:
+    expected = ""
+    for line in checksum_text.splitlines():
+        parts = line.strip().split()
+        if parts and len(parts[0]) == 128:
+            if len(parts) == 1 or parts[-1].lstrip("*").endswith(file_path.name):
+                expected = parts[0].lower()
+                break
+    if not expected:
+        return
+    h = hashlib.sha512()
+    with file_path.open("rb") as fh:
+        while chunk := fh.read(1024 * 1024):
+            h.update(chunk)
+    actual = h.hexdigest().lower()
+    if actual != expected:
+        raise ValueError(f"SHA-512 checksum mismatch for {file_path.name}")
+
+
 def install_ge_proton(
     *,
     home: str | Path | None = None,
     fetcher: Callable[[str], bytes] | None = None,
     downloader: Callable[[str, Path], None] | None = None,
 ) -> ReleaseAsset:
-    """Download and safely extract the latest GE-Proton runner into FEATHEROS_HOME/runners."""
+    """Download, verify SHA-512 (when available), and safely extract latest GE-Proton."""
     asset = fetch_latest_ge_proton(fetcher=fetcher)
+    if not asset.download_url.startswith("https://"):
+        raise ValueError(f"Refusing non-HTTPS download URL: {asset.download_url}")
     runners_dir = get_featheros_home(home) / "runners"
     runners_dir.mkdir(parents=True, exist_ok=True)
 
@@ -216,6 +255,13 @@ def install_ge_proton(
             with urllib.request.urlopen(req, timeout=300) as resp, archive_path.open("wb") as out:
                 while chunk := resp.read(1024 * 1024):
                     out.write(chunk)
+            if asset.sha512_url:
+                sha_req = urllib.request.Request(
+                    asset.sha512_url,
+                    headers={"User-Agent": f"FeatherOS-RunnerManager/{__version__}"},
+                )
+                with urllib.request.urlopen(sha_req, timeout=30) as sresp:
+                    _verify_sha512(archive_path, sresp.read().decode("utf-8", errors="ignore"))
         safe_extract_tarball(archive_path, runners_dir)
 
     return asset

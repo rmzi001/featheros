@@ -1,5 +1,8 @@
 #!/bin/sh
-# Start an available Polkit GUI authentication agent for XFCE 4.20
+# Start exactly one Polkit GUI authentication agent for XFCE 4.20 (guards against duplicate agents)
+if pgrep -u "$(id -u)" -f 'polkit.*authentication-agent|lxpolkit' >/dev/null 2>&1; then
+  exit 0
+fi
 if [ -x /usr/lib/x86_64-linux-gnu/polkit-mate-authentication-agent-1 ]; then
   exec /usr/lib/x86_64-linux-gnu/polkit-mate-authentication-agent-1
 elif [ -x /usr/lib/mate-polkit/polkit-mate-authentication-agent-1 ]; then

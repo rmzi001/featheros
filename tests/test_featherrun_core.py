@@ -184,6 +184,12 @@ class TestPEInspector(unittest.TestCase):
             self.assertEqual(info.arch, "arm64")
             self.assertIn("Unsupported", info.error or "")
 
+            # Building launch plan for invalid/ARM64 PE must NOT create an orphan bottle on disk
+            mgr = BottleManager(home=Path(tmp) / "feather")
+            plan = mgr.build_launch_plan(arm_exe, isolated=True, probe=make_mock_probe(vulkan_hw=True))
+            self.assertFalse(plan.binary_info.valid)
+            self.assertEqual(mgr.list_bottles(), [])
+
 
 class TestSystemProbe(unittest.TestCase):
     def test_probe_hardware_vulkan_and_meminfo(self) -> None:
@@ -323,6 +329,10 @@ class TestShortcutsAndLnkParser(unittest.TestCase):
             self.assertIn("Name=NoteApp Pro", desktop_text)
             self.assertIn("feather-run", desktop_text)
             self.assertIn("--portable", desktop_text)
+            # Freedesktop Exec= spec requires double quotes, never single quotes around paths with spaces
+            exec_line = next(ln for ln in desktop_text.splitlines() if ln.startswith("Exec="))
+            self.assertIn('"', exec_line)
+            self.assertNotIn("'", exec_line)
 
             removed = prune_bottle_shortcuts("office", applications_dir=apps_dir)
             self.assertEqual(len(removed), 1)

@@ -209,13 +209,30 @@ def get_applications_dir(override: str | Path | None = None) -> Path:
     return Path.home() / ".local" / "share" / "applications"
 
 
+def _quote_desktop_exec_arg(arg: str) -> str:
+    """Quote an Exec= argument per the Freedesktop Desktop Entry specification."""
+    escaped = (
+        arg.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("$", "\\$")
+        .replace("`", "\\`")
+        .replace("%", "%%")
+    )
+    if not escaped or any(ch in arg for ch in ' \t\n"\'\\><~|&;$*?#()`%'):
+        return f'"{escaped}"'
+    return escaped
+
+
 def render_desktop_entry(shortcut: WindowsShortcut) -> str:
     """Render an XDG .desktop entry that launches the Windows app via feather-run."""
     exec_parts = ["feather-run", "--bottle", shortcut.bottle_slug, str(shortcut.target_path)]
     if shortcut.arguments:
         exec_parts.append("--")
-        exec_parts.extend(shlex.split(shortcut.arguments, posix=False))
-    exec_line = " ".join(shlex.quote(part) for part in exec_parts)
+        try:
+            exec_parts.extend(shlex.split(shortcut.arguments, posix=True))
+        except ValueError:
+            exec_parts.extend(shortcut.arguments.split())
+    exec_line = " ".join(_quote_desktop_exec_arg(part) for part in exec_parts)
 
     lines = [
         "[Desktop Entry]",

@@ -1,17 +1,22 @@
 #!/bin/sh
-# FeatherOS v0.3.0 first-login session bootstrap (XFCE 4.20 + Windows 11 Dark/Light Glass)
+# FeatherOS v0.4.0 first-login session bootstrap (XFCE 4.20 + Windows 11 Dark/Light Glass)
 set -eu
 
 STAMP="$HOME/.config/featheros/.firstboot-done"
+THEME_CFG="$HOME/.config/featheros/theme.json"
 WALLPAPER="/usr/share/backgrounds/featheros/wallpaper.svg"
+if [ -f "$THEME_CFG" ] && grep -q '"light"' "$THEME_CFG" 2>/dev/null; then
+  WALLPAPER="/usr/share/backgrounds/featheros/wallpaper-light.svg"
+fi
+
 mkdir -p "$HOME/.config/featheros" "$HOME/.config/gtk-3.0" "$HOME/Desktop" "$HOME/Downloads" "$HOME/Documents" "$HOME/Pictures"
 
-# Initialize XDG user directories so Thunar displays standard Papirus folder icons
+# Initialize XDG user directories so File Explorer displays standard Papirus folder icons
 if command -v xdg-user-dirs-update >/dev/null 2>&1; then
   xdg-user-dirs-update || true
 fi
 
-# Ensure default Windows compatibility bottle exists and expose ~/Windows-C shortcut + Thunar sidebar bookmark
+# Ensure default Windows compatibility bottle exists and expose ~/Windows-C shortcut + sidebar bookmark
 if command -v feather-run >/dev/null 2>&1; then
   if [ ! -d "$HOME/.local/share/featheros/bottles/default" ]; then
     feather-run bottles create default --windows-version win10 >/dev/null 2>&1 || true
@@ -27,8 +32,8 @@ if command -v feather-run >/dev/null 2>&1; then
   feather-run sync >/dev/null 2>&1 || true
 fi
 
-# Dynamically apply FeatherOS wallpaper to every active XFCE monitor connector
-if command -v xfconf-query >/dev/null 2>&1 && [ -f "$WALLPAPER" ]; then
+# On first login only, bind the active theme wallpaper to every connected XFCE monitor
+if [ ! -f "$STAMP" ] && command -v xfconf-query >/dev/null 2>&1 && [ -f "$WALLPAPER" ]; then
   sleep 1
   for prop in $(xfconf-query -c xfce4-desktop -l 2>/dev/null | grep 'last-image$' || true); do
     xfconf-query -c xfce4-desktop -p "$prop" -s "$WALLPAPER" >/dev/null 2>&1 || true

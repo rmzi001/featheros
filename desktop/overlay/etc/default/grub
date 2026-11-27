@@ -1,0 +1,7 @@
+# FeatherOS default GRUB2 configuration for installed systems
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=5
+GRUB_DISTRIBUTOR="FeatherOS"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+GRUB_CMDLINE_LINUX=""
+GRUB_DISABLE_OS_PROBER=false

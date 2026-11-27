@@ -99,17 +99,17 @@ insmod all_video
 insmod gfxterm
 
 menuentry "${OS_PRETTY_NAME} — Live Desktop" {
-    linux /live/vmlinuz boot=live components quiet splash console=tty0 console=ttyS0,115200n8
+    linux /live/vmlinuz boot=live components quiet splash console=ttyS0,115200n8 console=tty0
     initrd /live/initrd
 }
 
 menuentry "${OS_PRETTY_NAME} — Safe Graphics / VM Mode" {
-    linux /live/vmlinuz boot=live components nomodeset console=tty0 console=ttyS0,115200n8
+    linux /live/vmlinuz boot=live components nomodeset console=ttyS0,115200n8 console=tty0
     initrd /live/initrd
 }
 
 menuentry "${OS_PRETTY_NAME} — Copy to RAM (Ultra Fast)" {
-    linux /live/vmlinuz boot=live components toram quiet splash console=tty0 console=ttyS0,115200n8
+    linux /live/vmlinuz boot=live components toram quiet splash console=ttyS0,115200n8 console=tty0
     initrd /live/initrd
 }
 EOF

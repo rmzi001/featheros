@@ -7,10 +7,21 @@
 @define-color theme_text_color #0f172a;
 @define-color theme_selected_bg_color #0284c7;
 @define-color theme_selected_fg_color #ffffff;
+@define-color insensitive_bg_color #e8eef7;
+@define-color insensitive_fg_color #64748b;
+@define-color borders rgba(15, 23, 42, 0.12);
 
 window, .background {
     background-color: #f3f6fb;
     color: #0f172a;
+}
+
+headerbar, .titlebar {
+    background-color: #e8eef7;
+    background-image: none;
+    color: #0f172a;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.10);
+    box-shadow: none;
 }
 
 button {
@@ -20,15 +31,59 @@ button {
     border: 1px solid rgba(15, 23, 42, 0.14);
     border-radius: 7px;
     box-shadow: none;
+    transition: background-color 120ms ease, border-color 120ms ease;
 }
 
 button:hover {
     background-color: #e2e8f0;
+    border-color: rgba(2, 132, 199, 0.65);
+}
+
+button:checked, button.suggested-action {
+    background-color: #0284c7;
+    color: #ffffff;
     border-color: #0284c7;
 }
 
+button:disabled {
+    background-color: #f1f5f9;
+    color: #94a3b8;
+    border-color: rgba(15, 23, 42, 0.08);
+}
+
+entry, combobox button, spinbutton {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    border-radius: 7px;
+}
+
+entry:focus {
+    border-color: #0284c7;
+    box-shadow: 0 0 0 1px #0284c7;
+}
+
+menu, .menu, .context-menu {
+    background-color: rgba(250, 252, 255, 0.97);
+    color: #0f172a;
+    border: 1px solid rgba(15, 23, 42, 0.13);
+    border-radius: 10px;
+    padding: 4px;
+}
+
+menu menuitem {
+    border-radius: 6px;
+    padding: 6px 10px;
+}
+
+menu menuitem:hover {
+    background-color: rgba(2, 132, 199, 0.15);
+    color: #0369a1;
+}
+
+/* Windows 11 Light Glass Taskbar (xfce4-panel) */
 .xfce4-panel.background {
-    background-color: rgba(240, 245, 252, 0.90);
+    background-color: rgba(244, 247, 252, 0.90);
     border-top: 1px solid rgba(15, 23, 42, 0.12);
     color: #0f172a;
 }
@@ -39,10 +94,12 @@ button:hover {
     border-radius: 7px;
     margin: 3px 2px;
     padding: 2px 6px;
+    color: #0f172a;
 }
 
 .xfce4-panel button:hover {
     background-color: rgba(15, 23, 42, 0.08);
+    border-color: rgba(15, 23, 42, 0.08);
 }
 
 .xfce4-panel button:checked, .xfce4-panel .tasklist button:checked {
@@ -50,6 +107,7 @@ button:hover {
     border-bottom: 2px solid #0284c7;
 }
 
+/* Windows 11 Rounded Light Glass Start Menu (Whisker Menu) */
 #whiskermenu-window {
     background-color: rgba(248, 250, 252, 0.96);
     color: #0f172a;
@@ -64,6 +122,36 @@ button:hover {
     padding: 6px 14px;
 }
 
+#whiskermenu-window treeview, #whiskermenu-window iconview {
+    background-color: transparent;
+    color: #1e293b;
+}
+
+#whiskermenu-window treeview:selected, #whiskermenu-window iconview:selected {
+    background-color: rgba(2, 132, 199, 0.16);
+    color: #0369a1;
+    border-radius: 8px;
+}
+
+/* Thunar Modern File Explorer Sidebar */
+.thunar .sidebar {
+    background-color: #e8eef7;
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.thunar .standard-view {
+    background-color: #ffffff;
+}
+
+/* Windows 11 Light Glass Notifications */
+#XfceNotifyWindow {
+    background-color: rgba(250, 252, 255, 0.96);
+    border: 1px solid rgba(2, 132, 199, 0.35);
+    border-radius: 12px;
+    color: #0f172a;
+}
+
+/* Windows 11 subtle edge Show Desktop sliver */
 .xfce4-panel #showdesktop-button, .xfce4-panel button.showdesktop {
     min-width: 10px;
     padding: 0 3px;
@@ -76,6 +164,16 @@ button:hover {
     opacity: 0;
 }
 
+/* Transparent desktop icon labels */
 XfdesktopIconView.view {
+    background-color: transparent;
+    color: #0f172a;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
     -XfdesktopIconView-ellipsize-icon-labels: 0;
+}
+
+XfdesktopIconView.view:active, XfdesktopIconView.view:selected {
+    background-color: rgba(2, 132, 199, 0.22);
+    color: #0f172a;
+    border-radius: 6px;
 }

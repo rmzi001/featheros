@@ -1,9 +1,10 @@
-PRETTY_NAME="FeatherOS 0.3.0 (Plume Wholesome)"
+PRETTY_NAME="FeatherOS 0.4.0 (Plume Wholesome)"
 NAME="FeatherOS"
-VERSION_ID="0.3.0"
-VERSION="0.3.0 (Plume Wholesome)"
+VERSION_ID="0.4.0"
+VERSION="0.4.0 (Plume Wholesome)"
 VERSION_CODENAME=plume-wholesome
 ID=featheros
 ID_LIKE=debian
 HOME_URL="https://github.com/rmzi001/featheros"
-ANSI_COLOR="1;36"
+SUPPORT_URL="https://github.com/rmzi001/featheros"
+BUG_REPORT_URL="https://github.com/rmzi001/featheros/issues"
